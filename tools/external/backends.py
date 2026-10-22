@@ -1,14 +1,13 @@
-"""Execution backends for external analyzers: local / wsl / docker.
+"""Execution backends for external analyzers: local / docker.
 
-All three backends funnel through :func:`fsa.utils.proc.run_command`, which never
+Both backends funnel through :func:`fsa.utils.proc.run_command`, which never
 raises on non-zero exits and converts timeouts into a structured result.
 
 Safety notes:
 * ``docker`` backend mounts only paths that were staged under the analyzer's
   workdir (``tmp/external/<tool>/<run_id>/``), which sits inside the
   ``./tmp`` path whitelist in ``config/safety.yaml``.
-* ``wsl`` backend reuses the project's ``C:\\... -> /mnt/c/...`` translation so
-  Windows host paths are usable inside the distro.
+* Analyzers run natively on Linux; there is no host-translation layer.
 """
 
 from __future__ import annotations
@@ -19,9 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from fsa.utils.proc import RunResult, run_command
-from tools.external.base import to_wsl_path
-
-WSL_DISTRO = "Ubuntu-22.04"
 
 
 @dataclass
@@ -59,32 +55,12 @@ def run_local(
     cwd: Path | None = None,
     timeout: float = 60.0,
 ) -> BackendResult:
-    """Run a command on the host (Linux, or Windows with native tooling)."""
+    """Run a command on the host (Linux)."""
     if not cmd:
         return BackendResult("failed", stderr="empty command")
     if shutil.which(cmd[0]) is None and not Path(cmd[0]).is_absolute():
         return BackendResult("missing", stderr=f"executable not found: {cmd[0]}")
     return _from_run_result(run_command(cmd, cwd=cwd, timeout=timeout))
-
-
-# --------------------------------------------------------------------------- #
-# wsl
-# --------------------------------------------------------------------------- #
-
-
-def run_wsl(
-    cmd: list[str],
-    *,
-    cwd: Path | None = None,
-    timeout: float = 60.0,
-    distro: str = WSL_DISTRO,
-) -> BackendResult:
-    """Run a command inside a WSL distro, translating host paths in arguments."""
-    if shutil.which("wsl.exe") is None and shutil.which("wsl") is None:
-        return BackendResult("missing", stderr="wsl executable not found")
-    translated = [to_wsl_path(c) if ("/" in c or "\\" in c) else c for c in cmd]
-    full = ["wsl", "-d", distro, "--"] + translated
-    return _from_run_result(run_command(full, cwd=cwd, timeout=timeout))
 
 
 # --------------------------------------------------------------------------- #
@@ -125,8 +101,7 @@ def run_docker(
     Args:
         image: Image reference, e.g. ``smile0304/satc``.
         cmd: Command executed inside the container.
-        mounts: Mapping of host path -> container path. Host paths are
-            translated for Docker Desktop's WSL2 backend.
+        mounts: Mapping of host path -> container path.
         memory: Optional hard memory limit, e.g. ``16g`` (Ghidra needs headroom).
         extra_args: Additional ``docker run`` flags appended before the image.
     """
@@ -135,7 +110,7 @@ def run_docker(
 
     full: list[str] = ["docker", "run", "--rm"]
     for host, container in (mounts or {}).items():
-        full += ["-v", f"{to_wsl_path(host)}:{container}"]
+        full += ["-v", f"{Path(host).resolve()}:{container}"]
     if memory:
         full += ["--memory", memory]
     for key, value in (env or {}).items():
@@ -161,6 +136,5 @@ def run_container_cmd(
 
 BACKENDS: dict[str, Any] = {
     "local": run_local,
-    "wsl": run_wsl,
     "docker": run_docker,
 }

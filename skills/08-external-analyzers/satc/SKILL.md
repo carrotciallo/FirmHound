@@ -106,7 +106,7 @@ external:
 | 跑太慢 | 单固件 90min，4 配置×3 固件 = 18h | 分级全量：4 脚本**全跑不带 taint**，再对 Top-1 二进制跑带 taint 慢模式，时间砍 60% |
 | 无 Web 前端 | `Clustering_result_v2.result` 很空 | 工具固有局限，记 `limitation`，不是你的锅 |
 | share2sink 依赖 ref2share | 直接跑报错 | **先跑 `ref2share`**，再用 `--ref2share_result` 指过去 |
-| Windows 挂载失败 | `docker: invalid mount config` | 走 `to_wsl_path()` 翻 `/mnt/c/...`；Docker Desktop 开该盘 file sharing |
+| 挂载失败 | `docker: invalid mount config` | 确认宿主路径存在、Docker 有权访问该目录；Linux 下无需路径翻译 |
 | 解包的符号链接 | rootfs 复制失败 | 复用 `fsa/utils/traverse.py` 符号链接容错，别自己 `cp -r` |
 
 ---

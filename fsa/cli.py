@@ -38,19 +38,6 @@ def _status_from_checks(checks: dict[str, dict[str, Any]]) -> str:
     return "ok"
 
 
-def _configure_tool_path(config_path: Path) -> None:
-    """Apply configured local tool shims before any analyzer runs."""
-    cfg = load_yaml(config_path)
-    tool_cfg = cfg.get("tools", {}) if isinstance(cfg, dict) else {}
-    if not tool_cfg.get("use_wsl_wrappers"):
-        return
-    wrappers = Path(tool_cfg.get("wsl_wrappers", ""))
-    if not wrappers.is_absolute():
-        wrappers = (config_path.parent.parent / wrappers).resolve()
-    if wrappers.is_dir():
-        os.environ["PATH"] = str(wrappers) + os.pathsep + os.environ.get("PATH", "")
-
-
 @click.group()
 @click.option(
     "--config",
@@ -75,7 +62,6 @@ def main(ctx: click.Context, config: Path) -> None:
     )
     ctx.ensure_object(dict)
     ctx.obj["config"] = config
-    _configure_tool_path(config)
 
 
 @main.command()

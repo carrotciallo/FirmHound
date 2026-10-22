@@ -1,7 +1,7 @@
 """Integration tests for the M2 unpacking pipeline.
 
-These tests require a Linux toolchain (file/strings/binwalk/unsquashfs/readelf).
-On Windows they automatically skip unless Docker is available.
+These tests require a Linux toolchain (file/strings/binwalk/unsquashfs/readelf)
+and skip automatically when it is missing.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def linux_ready() -> bool:
 
 
 def _build_squashfs_fixture(tmp_path: Path) -> Path:
-    """Build a tiny SquashFS fixture using the host/WSL toolchain."""
+    """Build a tiny SquashFS fixture using the host toolchain."""
     fixture_dir = tmp_path / "rootfs"
     fixture_dir.mkdir()
     (fixture_dir / "bin").mkdir()
@@ -54,8 +54,6 @@ def _build_squashfs_fixture(tmp_path: Path) -> Path:
     (fixture_dir / "etc" / "init.d" / "rcS").write_text("#!/bin/sh\n", encoding="utf-8")
 
     image_path = tmp_path / "fixture.squashfs"
-    # On Windows the Linux tools are .bat shims (tools/wsl_wrappers), which
-    # CreateProcess can only launch via their resolved absolute path.
     mksquashfs = shutil.which("mksquashfs") or "mksquashfs"
     subprocess.run(
         [mksquashfs, str(fixture_dir), str(image_path), "-noappend", "-quiet"],

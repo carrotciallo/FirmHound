@@ -106,7 +106,7 @@ class ExternalAnalyzer(ABC):
 
 完整代码骨架见根目录计划 §4.2。**E 在 8/30 下午落地 `base.py` + `backends.py`**，四人各自只写子类。
 
-执行后端三选一：`local`（纯 Linux）/ `wsl`（复用 `tools/wsl_wrappers/to_wsl_path()`）/ `docker`（SaTC、FirmRec）。
+执行后端二选一：`local`（宿主机原生）/ `docker`（SaTC、FirmRec）。
 
 ### 3.3 三人必须遵守的四条铁律
 

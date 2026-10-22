@@ -97,7 +97,7 @@ python satc.py \
 - [ ] **8/30 下午统一下载 L3 的两个真实固件**，放 `firmware_samples/`
   - 建议：Tenda AC15（命令注入，与主轨 `04-audit/command-injection` 的复现经验直接对照）、Netgear R7000 或 TP-Link 同类
   - 下载后记录：来源 URL、SHA256、大小、架构 → `docs/external/dataset.md`
-- [ ] L1 合成固件：`bash scripts/e2e/build_firmware.sh`（WSL 内跑，输出到 `/mnt/c/temp/fw_demo`）
+- [ ] L1 合成固件：`bash scripts/e2e/build_firmware.sh`（输出到 `tmp/fw_demo`）
 
 ---
 
@@ -108,7 +108,7 @@ python satc.py \
 | 时间 | 任务 | 产出 |
 |---|---|---|
 | 13:00–14:00 | **冻结 §5.1 三个契约文件**（这是四人并行的地基，最高优先级） | `schemas/external_finding.schema.json`、`schemas/examples/external_finding.example.json` |
-| 14:00–16:00 | 落地 `tools/external/base.py`（`ExternalAnalyzer` ABC + `AnalysisContext` + `ProbeResult` + `RunOutcome`）+ `backends.py`（local/wsl/docker）+ `__init__.py` | 可 import，四人可继承 |
+| 14:00–16:00 | 落地 `tools/external/base.py`（`ExternalAnalyzer` ABC + `AnalysisContext` + `ProbeResult` + `RunOutcome`）+ `backends.py`（local/docker）+ `__init__.py` | 可 import，四人可继承 |
 | 14:00–16:00 **并行** | `docker pull smile0304/satc`（后台跑） | 镜像就位 |
 | 16:00–17:00 | 建 `tools/registry/external.yaml` 骨架 + `config/dev.yaml` 的 `external:` 段（全关） | 配置就位 |
 | 17:00–18:00 | **下载 L3 真实固件** + 建 `docs/external/dataset.md` | 数据集就位 |
@@ -187,7 +187,7 @@ python satc.py \
 
 ```
 tools/external/base.py                  # ExternalAnalyzer ABC（你写，四人继承）
-tools/external/backends.py              # local / wsl / docker 后端（你写）
+tools/external/backends.py              # local / docker 后端（你写）
 tools/external/run_all.py               # EXTERNAL_ANALYSIS 阶段并行调度（你写）
 tools/external/satc/__init__.py
 tools/external/satc/runner.py           # SatcAnalyzer(ExternalAnalyzer)
@@ -222,7 +222,7 @@ class SatcAnalyzer(ExternalAnalyzer):
     def run(self, ctx) -> RunOutcome:
         # 对每种 ghidra_script 配置起一次容器
         # docker run --rm --memory=16g \
-        #   -v <to_wsl_path(workdir)>:/work \
+        #   -v <workdir 绝对路径>:/work \
         #   smile0304/satc python satc.py -d /work/rootfs -o /work/out/... \
         #   --ghidra_script X --taint_check -b <bin>
         # 硬超时 ctx.timeout_s；超时返回 status="timeout"
@@ -232,7 +232,7 @@ class SatcAnalyzer(ExternalAnalyzer):
 ```
 
 > **安全约束**：`docker run` 的 `-v` 挂载路径必须落在 `./tmp/external/satc/<run_id>/` 内
-> （`./tmp` 在 `config/safety.yaml` 白名单）。Windows 路径走 `to_wsl_path()` 翻译。
+> （`./tmp` 在 `config/safety.yaml` 白名单），宿主路径直接挂载，无需翻译。
 
 ### 6.3 Parser 映射表（11 类输出文件 → external_finding）
 
@@ -333,7 +333,7 @@ B 组：--depth full + satc     （只开 SaTC，关 KLEE/BOND/FirmRec）
 | **跑太慢** | 单固件 90 分钟，4 配置 × 3 固件 = 18 小时 | **分级全量**：4 种配置**全部跑不带 `--taint_check` 的快模式**；再对 Top-1 边界二进制跑带 `--taint_check` 的慢模式。这样全量覆盖到了，时间砍掉 60% |
 | **无 Web 前端的固件关键字少** | `Clustering_result_v2.result` 很空 | 这是工具固有局限，记 `limitation`，不是你的锅 |
 | **`share2sink` 依赖 `ref2share` 结果** | 直接跑会报错 | 必须**先跑 `ref2share`**，再用 `--ref2share_result` 指向其输出 |
-| Windows 路径挂载失败 | `docker: invalid mount config` | 走 `to_wsl_path()` 翻译成 `/mnt/c/...`；确认 Docker Desktop 已开启该盘符的 file sharing |
+| 挂载路径报错 | `docker: invalid mount config` | 确认宿主路径存在且 Docker 有权访问；路径必须是绝对路径 |
 | 解包的 Linux 符号链接 | rootfs 复制失败 | 复用 `fsa/utils/traverse.py` 的符号链接容错，别自己 `cp -r` |
 
 ---

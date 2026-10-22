@@ -22,7 +22,6 @@ Commands:
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 import sys
@@ -72,13 +71,9 @@ def cmd_dev(args: argparse.Namespace) -> int:
     return run([PYTHON, "-m", "pip", "install", "-e", "."], cwd=REPO_ROOT)
 
 
-def _pytest(paths: list[str], *, with_wsl_wrappers: bool = False) -> int:
-    """Run pytest with optional WSL wrappers and an explicit test scope."""
-    env = os.environ.copy()
-    if with_wsl_wrappers and os.name == "nt":
-        wrappers = REPO_ROOT / "tools" / "wsl_wrappers"
-        env["PATH"] = str(wrappers) + os.pathsep + env.get("PATH", "")
-    return subprocess.call([PYTHON, "-m", "pytest", *paths], cwd=REPO_ROOT, env=env)
+def _pytest(paths: list[str]) -> int:
+    """Run pytest with an explicit test scope."""
+    return subprocess.call([PYTHON, "-m", "pytest", *paths], cwd=REPO_ROOT)
 
 
 def cmd_test(args: argparse.Namespace) -> int:
@@ -88,12 +83,12 @@ def cmd_test(args: argparse.Namespace) -> int:
 
 def cmd_test_all(args: argparse.Namespace) -> int:
     """Run unit tests plus host-dependent integration tests."""
-    return _pytest(["tests"], with_wsl_wrappers=True)
+    return _pytest(["tests"])
 
 
 def cmd_integration(args: argparse.Namespace) -> int:
     """Run host-dependent integration tests only."""
-    return _pytest(["tests/integration"], with_wsl_wrappers=True)
+    return _pytest(["tests/integration"])
 
 
 def cmd_ext_smoke(args: argparse.Namespace) -> int:

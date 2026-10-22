@@ -16,7 +16,6 @@ from tools.external.base import (
     dedup_key,
     normalize_addr,
     normalize_binary_id,
-    to_wsl_path,
 )
 
 __all__ = [
@@ -28,5 +27,4 @@ __all__ = [
     "dedup_key",
     "normalize_addr",
     "normalize_binary_id",
-    "to_wsl_path",
 ]

@@ -17,7 +17,6 @@ Design rules (non-negotiable, see docs/external/README.md §3.3):
 
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,8 +34,6 @@ RECURRENCE_ONLY_TOOLS = frozenset({"firmrec"})
 # --------------------------------------------------------------------------- #
 # Shared normalization helpers
 # --------------------------------------------------------------------------- #
-
-_WIN_PATH_RE = re.compile(r"^[A-Za-z]:[/\\].*$")
 
 
 def normalize_binary_id(rootfs: Path, path: Path | str) -> str:
@@ -72,15 +69,6 @@ def normalize_addr(addr: str | int | None) -> str:
     except ValueError:
         return text.lower()
     return hex(value)
-
-
-def to_wsl_path(arg: str | Path) -> str:
-    """Translate a Windows absolute path to its WSL ``/mnt/<drive>/...`` form."""
-    text = str(arg).replace("\\", "/")
-    if _WIN_PATH_RE.match(text):
-        drive = text[0].lower()
-        return f"/mnt/{drive}/{text[2:].lstrip('/')}"
-    return text
 
 
 # --------------------------------------------------------------------------- #

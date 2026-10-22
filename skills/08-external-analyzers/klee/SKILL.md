@@ -64,7 +64,7 @@ bitcode 语义，**天然跨架构**——不需要 qemu、不需要真机、不
 python -m tools.external.adapter run_klee <run_dir> --config-path config/dev.yaml
 
 # 全链路（--depth full 下 SYMEX_PRUNE 自动路由到本工具）
-python scripts/dev.py test        # 仅跑单测（不要加 WSL 解包集成测试）
+python scripts/dev.py test        # 仅跑单测（解包集成测试需宿主工具链）
 pytest tests/unit/test_external_klee.py tests/unit/test_harness_gen.py tests/unit/test_external_klee_runner.py
 ```
 
@@ -80,7 +80,7 @@ pytest tests/unit/test_external_klee.py tests/unit/test_harness_gen.py tests/uni
 | 外部函数无法符号化 | `exec.err` 满屏 | 全部写桩；`exec.err` 归 limitation |
 | `model.err` 被误当漏洞 | 误报变多 | parser 显式把 `model.err`/`exec.err` 路由 limitation（单测覆盖） |
 | harness 过度简化误杀 | 剪枝率异常高 | 抽检 + `harness_version` 可追溯 + 只写反证不删候选 |
-| Windows 跑不了 | KLEE 无 Win 支持 | `backend=wsl` 或 Docker（`kleever/klee:llvm-16`） |
+| 宿主没有 KLEE | 未安装 LLVM 16 + Z3 | 用 Docker（`kleever/klee:llvm-16`）或按官方文档安装 |
 | 真实运行被环境挡 | Docker 文件共享坏 / 无 KLEE | 代码全落地 + 单测全绿；真实符号执行在 8/31 机器任务补 |
 
 ## 8. 交付档位（F1–F9 + X1/X2）

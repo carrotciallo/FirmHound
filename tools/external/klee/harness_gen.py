@@ -13,8 +13,8 @@ that
     ``.ktest`` when the path is feasible.
 
 The generated ``.c`` is compiled to ``.bc`` (clang -emit-llvm) -- either on the
-host (if clang is available) or, more importantly, inside the *backend*
-(wsl / docker) where KLEE's LLVM toolchain lives. The runner drives that second
+host (if clang is available) or inside the *backend* (docker) where KLEE's LLVM
+toolchain lives. The runner drives that second
 step; this module only produces + (best-effort) compiles the source.
 
 Three bitcode strategies (see docs/external/G-KLEE.md §4):
@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tools.external.backends import run_local, run_wsl
+from tools.external.backends import run_local
 
 # Single source of truth for harness traceability (G-KLEE.md §6.3 / X2).
 HARNESS_VERSION = "v1"
@@ -325,13 +325,13 @@ def compile_to_bc(
     """Compile a harness ``.c`` to LLVM ``.bc`` via the chosen backend.
 
     Returns ``(ok, detail)``. A missing clang degrades to ``(False, ...)`` rather
-    than raising -- the runner may still compile inside wsl/docker later.
+    than raising -- the runner may still compile inside docker later.
     """
     clang = _clang_binary(llvm)
     if clang is None and backend in {"auto", "local"}:
         return False, f"clang (llvm-{llvm}) not found on host"
     cmd = [clang or "clang", "-emit-llvm", "-c", "-O0", "-g", str(c_path), "-o", str(bc_path)]
-    res = run_wsl(cmd, timeout=timeout) if backend == "wsl" else run_local(cmd, timeout=timeout)
+    res = run_local(cmd, timeout=timeout)
     if res.status == "missing":
         return False, res.stderr or "clang executable not found in backend"
     if res.status != "ok":
@@ -343,7 +343,7 @@ def generate_harness(spec: HarnessSpec, out_dir: Path) -> HarnessResult:
     """Write a harness ``.c`` into ``out_dir`` and (best-effort) compile to ``.bc``.
 
     Never raises. Compilation failure is recorded in ``errors`` and the ``.bc``
-    is left for the backend (wsl/docker) to produce at run time.
+    is left for the backend (docker) to produce at run time.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

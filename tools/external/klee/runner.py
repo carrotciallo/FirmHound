@@ -19,9 +19,9 @@ The runner writes ``harness_map.json`` in ``prepare`` so the parser can re-bind
 each ``klee-out-N`` directory to its candidate (filling ``binary_id`` / ``sink``
 / ``source`` / ``constraints``) without re-deriving them.
 
-Backends: auto (wsl -> local -> docker) / wsl / local / docker. On a host where
-KLEE is not installed, ``probe()`` returns ``available=False`` and the whole
-stage degrades to ``skipped`` -- never aborting the pipeline.
+Backends: auto (local -> docker) / local / docker. On a host where KLEE is not
+installed, ``probe()`` returns ``available=False`` and the whole stage degrades
+to ``skipped`` -- never aborting the pipeline.
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ from tools.external.backends import (
     docker_image_exists,
     run_docker,
     run_local,
-    run_wsl,
 )
 from tools.external.base import AnalysisContext, ExternalAnalyzer, ProbeResult, RunOutcome
 from tools.external.klee.harness_gen import (
@@ -62,7 +61,7 @@ class KleeAnalyzer(ExternalAnalyzer):
         self.max_time_s: int = int(cfg.get("max_time_s", 14400))
         self.solver: str = str(cfg.get("solver", "z3"))
         self.image: str = str(cfg.get("image", IMAGE))
-        self.backend: str = str(cfg.get("backend", "auto"))  # auto|wsl|local|docker
+        self.backend: str = str(cfg.get("backend", "auto"))  # auto|local|docker
         self.timeout_s: int = int(cfg.get("timeout_s", self.max_time_s))
         self.max_forks: int = int(cfg.get("max_forks", 64))
         self.max_depth: int = int(cfg.get("max_depth", 200))
@@ -90,12 +89,9 @@ class KleeAnalyzer(ExternalAnalyzer):
             return ProbeResult(
                 available=True, version=self._image_version(), backend="docker", notes=detail
             )
-        # wsl / local: a bare `klee --version` is the availability signal.
+        # local: a bare `klee --version` is the availability signal.
         probe_cmd = ["klee", "--version"]
-        if backend == "wsl":
-            res = run_wsl(probe_cmd, timeout=30.0)
-        else:
-            res = run_local(probe_cmd, timeout=30.0)
+        res = run_local(probe_cmd, timeout=30.0)
         if res.status == "missing":
             return ProbeResult(
                 available=False,
@@ -116,11 +112,9 @@ class KleeAnalyzer(ExternalAnalyzer):
         )
 
     def _resolve_backend(self) -> str:
-        if self.backend in {"wsl", "local", "docker"}:
+        if self.backend in {"local", "docker"}:
             return self.backend
-        # auto: prefer wsl (Linux toolchain), then local, then docker if image present.
-        if run_wsl(["true"], timeout=10.0).status == "ok":
-            return "wsl"
+        # auto: prefer a native Linux toolchain, then docker if the image is present.
         if run_local(["klee", "--version"], timeout=10.0).status == "ok":
             return "local"
         ok, _ = docker_available()
@@ -283,9 +277,7 @@ class KleeAnalyzer(ExternalAnalyzer):
             return None
         bc_path = c_path.with_suffix(".bc")
         host_cmd = ["clang", "-emit-llvm", "-c", "-O0", "-g", str(c_path), "-o", str(bc_path)]
-        if backend == "wsl":
-            res = run_wsl(host_cmd, timeout=300.0)
-        elif backend == "docker":
+        if backend == "docker":
             # Compile inside the container: mount the .c's parent to /work and use
             # container paths so clang resolves the bitcode correctly.
             cont_c = f"/work/{c_path.name}"
@@ -330,9 +322,7 @@ class KleeAnalyzer(ExternalAnalyzer):
             f"--output-dir={out_dir}",
             str(bc),
         ]
-        if backend == "wsl":
-            res = run_wsl(cmd, timeout=float(self.timeout_s))
-        elif backend == "docker":
+        if backend == "docker":
             res = run_docker(
                 self.image,
                 cmd,

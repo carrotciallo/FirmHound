@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import shutil
 import subprocess
@@ -28,6 +29,7 @@ def run_command(
     cwd: str | Path | None = None,
     timeout: float = 60.0,
     shell: bool = False,
+    env: dict[str, str] | None = None,
 ) -> RunResult:
     """Run a command safely and return a structured result.
 
@@ -40,6 +42,8 @@ def run_command(
         cwd: Working directory for the child process.
         timeout: Maximum runtime in seconds.
         shell: If True, run through the shell (avoid unless required).
+        env: Extra environment variables merged over the current environment.
+            Used to pin a stable locale (``LC_ALL=C``) when parsing tool output.
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
@@ -60,6 +64,7 @@ def run_command(
             text=True,
             errors="replace",
             check=False,
+            env={**os.environ, **env} if env else None,
         )
         status = "success" if proc.returncode == 0 else "failed"
         return RunResult(

@@ -32,7 +32,11 @@ def _readelf_header(path: Path) -> dict[str, Any] | None:
     """Parse ``readelf -h`` output for a single ELF."""
     if shutil.which("readelf") is None:
         return None
-    result = run_command(["readelf", "-h", str(path)], timeout=30)
+    # Pin the C locale: readelf localises its field labels, which would make the
+    # regexes below silently miss and degrade architecture detection to "unknown".
+    result = run_command(
+        ["readelf", "-h", str(path)], timeout=30, env={"LC_ALL": "C", "LANG": "C"}
+    )
     if result.status != "success":
         return None
     text = result.stdout

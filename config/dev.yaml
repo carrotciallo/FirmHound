@@ -27,10 +27,6 @@ logging:
   format: jsonl
   destination: ./runs/logs
 
-tools:
-  use_wsl_wrappers: true
-  wsl_wrappers: ./tools/wsl_wrappers
-
 # --------------------------------------------------------------------------- #
 # External analyzers (SaTC / FirmRec / KLEE / BOND)
 #
@@ -74,7 +70,7 @@ external:
     # Symbolic execution. Needs LLVM bitcode (wllvm) or a lifted binary harness.
     harness: auto                  # auto | source | binary
     max_time_s: 14400              # 4h cap per harness (S3 binary-lift hard stop)
-    backend: auto                  # auto | wsl | local | docker (KLEE runs via LLVM bitcode)
+    backend: auto                  # auto | local | docker (KLEE runs via LLVM bitcode)
     solver: z3                     # KLEE solver backend (z3 recommended; stp also supported)
     image: kleever/klee:llvm-16    # docker image (LLVM 16 + Z3 + KLEE 3.2) when backend=docker
     llvm: "16"                     # LLVM toolchain version expected by the backend

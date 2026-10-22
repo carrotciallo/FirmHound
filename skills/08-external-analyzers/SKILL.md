@@ -59,4 +59,4 @@ tags: [external, orchestration, satc, firmrec, klee, bond, fusion]
 - `--depth full` 产出 external/fusion/unified/report 完整工件链。
 - 四器全关时结果与基线一致；8 种开关组合均不 abort。
 - Blind Run 中 FirmRec 无法进入 unified candidates。
-- 单元测试不依赖 Docker、WSL、IDA、KLEE 或真实设备。
+- 单元测试不依赖 Docker、IDA、KLEE 或真实设备。

@@ -5,7 +5,7 @@
 **IoT 固件漏洞挖掘自动化流水线** · 解包 → 攻击面 → 二进制分析 → 静态审计 → 十维评分 → 反证验证 → 动态验证 → 证据报告
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20WSL2%20%7C%20Linux-2F6FAD)](docs/wsl_dev_guide.md)
+[![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
 [![Tests](https://img.shields.io/badge/tests-320%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
@@ -23,9 +23,7 @@
 - [核心特性](#核心特性)
 - [快速开始（60 秒）](#快速开始60-秒)
 - [系统架构](#系统架构)
-- [环境配置：两条路任选](#环境配置两条路任选)
-  - [路线 A：Windows + WSL2](#路线-a-windows--wsl2推荐)
-  - [路线 B：纯 Linux](#路线-b-纯-linux)
+- [环境配置（Linux）](#环境配置linux)
 - [拿到固件后怎么做（完整流程）](#拿到固件后怎么做完整流程)
   - [第 1 步 · 放置固件](#第-1-步--放置固件)
   - [第 2 步 · 解包固件](#第-2-步--解包固件)
@@ -59,7 +57,7 @@
 |---|---|
 | 🐾 全流程自动化 | M0–M14 模块化，阶段机驱动（`fsa/orchestrator/engine.py`），支持断点续跑 |
 | 🎯 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配现场新固件 |
-| 🐍 纯 Python 分析 | pyelftools + capstone 解析 ELF，Windows 可直跑，不强制依赖 Ghidra/objdump |
+| 🐍 纯 Python 分析 | pyelftools + capstone 解析 ELF，Linux 原生运行，不强制依赖 Ghidra/objdump |
 | 🔌 双运行时 | `offline`（确定性离线规则，不生成模型结论） / `openai_compatible`（国内备案模型） |
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
@@ -84,7 +82,7 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
   --authorization-holder "设备所有者" --depth full
 ```
 
-> ⚠️ CLI 只接受 `config/safety.yaml` 白名单内的输入路径。Windows/Linux 都可分析 rootfs；直接解包真实固件仍建议准备 WSL/Linux 解包工具链。
+> ⚠️ CLI 只接受 `config/safety.yaml` 白名单内的输入路径，且只支持 Linux 原生环境。
 
 ## 系统架构
 
@@ -119,92 +117,12 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
 
 ---
 
-## 环境配置：两条路任选
+## 环境配置（Linux）
 
-> **核心原则**：静态分析层是**纯 Python**（pyelftools/capstone），Windows 直接跑；**解包与动态验证**依赖 Linux 工具链（binwalk / sasquatch / qemu）。所以有两条路：
+> 本项目只支持 **Linux 原生**环境（物理机 / 服务器 / 云主机 / 容器均可）。
+> 静态分析层是纯 Python（pyelftools/capstone），解包与动态验证依赖 Linux 工具链（binwalk / sasquatch / qemu）。
 
-| 路线 | 适用人群 | 解包 | 静态分析 | 动态验证 |
-|---|---|---|---|---|
-| **A. Windows + WSL2** | 主力机是 Windows 的同学 | ✅ WSL2 内 | ✅ 任意一侧 | ✅ WSL2 内 |
-| **B. 纯 Linux** | 有 Linux 机器/服务器/云主机 | ✅ 原生 | ✅ 原生 | ✅ 原生 |
-
----
-
-### 路线 A：Windows + WSL2（推荐）
-
-日常在 Windows 上操作，解包时通过 WSL2 调用 Linux 工具，全程无需切换系统。
-
-#### A1. 安装 WSL2
-
-```powershell
-# 以管理员身份打开 PowerShell，执行：
-wsl --install -d Ubuntu-22.04
-```
-
-> **注意**：安装后**必须重启电脑**。重启后 WSL 会自动完成 Ubuntu 初始化，并让你设置 Linux 用户名/密码（记好密码，后面 `sudo` 要用）。
-
-验证：
-
-```powershell
-wsl -l -v
-# 应看到 Ubuntu-22.04，VERSION 列为 2（表示 WSL2，不是 WSL1）
-```
-
-> **如果 VERSION 是 1**：执行 `wsl --set-version Ubuntu-22.04 2` 升级到 WSL2。
-
-#### A2. 安装 Linux 工具链（一键脚本）
-
-```powershell
-# 在 PowerShell 中执行（脚本会自动完成 apt 安装 + binwalk/sasquatch 编译）
-wsl -d Ubuntu-22.04 -- bash /mnt/c/Users/22067/Desktop/揭榜挂帅——网络安全/scripts/setup_wsl.sh
-```
-
-> 脚本会安装：`binwalk`、`squashfs-tools`（unsquashfs/mksquashfs）、`sasquatch`（非标准 SquashFS）、`cpio`、`p7zip`、`qemu-user-static`、`strings/readelf/objdump` 等。
-
-#### A3. 安装 Python 与项目依赖（Windows 侧）
-
-```powershell
-# 1) 安装 Python 3.11+（https://www.python.org/downloads/，勾选 "Add to PATH"）
-
-# 2) 进入项目目录，创建虚拟环境
-cd C:\Users\22067\Desktop\揭榜挂帅——网络安全
-python -m venv .venv
-.venv\Scripts\activate
-
-# 3) 安装依赖
-pip install -r requirements.txt
-pip install -e .
-```
-
-#### A4. 验证两条路都通
-
-```powershell
-# Windows 侧：单元测试
-python scripts/dev.py test
-
-# WSL 侧：工具链自检
-wsl -d Ubuntu-22.04 -- bash -lc "which binwalk unsquashfs sasquatch strings readelf"
-```
-
-#### A5. 常见问题（Windows + WSL2）
-
-| 问题 | 原因 | 解决 |
-|---|---|---|
-| `wsl --install` 后重启仍报错 | WSL 内核/虚拟化未启用 | BIOS 开启虚拟化（VT-x/AMD-V）；PowerShell 执行 `bcdedit /set hypervisorlaunchtype auto` 后重启 |
-| `wsl -l -v` 显示 VERSION=1 | 默认 WSL1 | `wsl --set-version Ubuntu-22.04 2` |
-| WSL 报 `Wsl/Service/0x8007274c` | WSL 服务偶发抽风（已知问题） | `wsl --shutdown` 后重新进 |
-| WSL 里 `localhost` 访问不了 Windows 服务 | NAT 模式代理未镜像 | 属正常现象，不影响本工具（我们只用 WSL 跑命令行工具） |
-| `binwalk: command not found` | PATH 未含 `~/.local/bin` | WSL 内执行 `export PATH="$HOME/.local/bin:$PATH"`，或重跑 setup_wsl.sh |
-| Windows 侧 `python` 不是内部命令 | 未加入 PATH | 重装 Python 并勾选 "Add to PATH"，或使用完整路径 |
-| 解包目录在 Windows 侧打不开 | 解包产物含 Linux 符号链接 | 属正常，Windows 资源管理器无法显示符号链接；用 CLI 分析即可（已做符号链接容错） |
-
----
-
-### 路线 B：纯 Linux
-
-适合有 Linux 笔记本 / 服务器 / 云主机的同学，**一切原生，无需 WSL**。
-
-#### B1. 安装系统依赖
+### 1. 安装系统依赖
 
 ```bash
 # Debian / Ubuntu 系
@@ -218,7 +136,7 @@ sudo dnf install -y binwalk squashfs-tools cpio p7zip p7zip-plugins file \
     gcc make binutils qemu-user-static qemu-system-arm python3 python3-pip git
 ```
 
-#### B2. 安装 sasquatch（非标准 SquashFS，强烈建议）
+### 2. 安装 sasquatch（非标准 SquashFS，强烈建议）
 
 ```bash
 cd /tmp
@@ -229,7 +147,7 @@ make && sudo make install
 
 > 很多路由固件用非标准 SquashFS（`squashfs:little endian` 变体），`unsquashfs` 解不了，必须用 sasquatch。
 
-#### B3. 安装 Python 与项目依赖
+### 3. 安装 Python 与项目依赖
 
 ```bash
 cd <项目路径>
@@ -239,14 +157,17 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-#### B4. 验证
+### 4. 验证
 
 ```bash
+fsa doctor
 python scripts/dev.py test
 which binwalk unsquashfs sasquatch strings readelf
 ```
 
-#### B5. 常见问题（纯 Linux）
+`fsa doctor` 会检查路径、Schema、运行时与外部工具；缺工具只报 degraded，不会阻断静态分析。
+
+### 5. 常见问题
 
 | 问题 | 原因 | 解决 |
 |---|---|---|
@@ -255,6 +176,9 @@ which binwalk unsquashfs sasquatch strings readelf
 | `Permission denied` 运行脚本 | 可执行位缺失 | `chmod +x scripts/*.sh` |
 | QEMU 缺架构 | 不同架构固件需不同 qemu | `sudo apt install qemu-user-static`（已含常见架构） |
 | `pip` 报 externally-managed-environment | 新版 Debian/Ubuntu 限制 | 用 venv（本项目推荐），或 `pip install --break-system-packages` |
+| `binwalk: command not found` | PATH 未含 `~/.local/bin` | `export PATH="$HOME/.local/bin:$PATH"`，或重装 binwalk |
+| 解包目录里有打不开的符号链接 | 固件含指向 `/dev/null` 的悬空链接 | 属正常现象，CLI 已做符号链接容错（`fsa/utils/traverse.py`） |
+| 能在 Windows 上跑吗 | 不支持 | 本项目已移除 Windows/WSL 适配层，请在 Linux 或容器内运行 |
 
 ---
 
@@ -280,14 +204,6 @@ which binwalk unsquashfs sasquatch strings readelf
 
 固件是"打包文件"，先解出里面的文件系统（rootfs）。
 
-**Windows + WSL2 路线**（PowerShell 执行）：
-
-```powershell
-wsl -d Ubuntu-22.04 -- bash -lc "cd /mnt/c/Users/<你的用户名>/Desktop/揭榜挂帅——网络安全 && binwalk -e -M firmware_samples/DIR859_FW102b03.bin -C /mnt/c/Users/<你的用户名>/Desktop/揭榜挂帅——网络安全/tmp/unpacked"
-```
-
-**纯 Linux 路线**：
-
 ```bash
 cd <项目路径>
 binwalk -e -M firmware_samples/DIR859_FW102b03.bin -C tmp/unpacked
@@ -309,22 +225,11 @@ sasquatch -d tmp/squashfs-root firmware_samples/DIR859_FW102b03.bin
 
 ### 第 3 步 · 静态分析
 
-**Windows 或 Linux 均可**（纯 Python，无需 WSL）：
+纯 Python 静态分析，直接跑：
 
 ```bash
-fsa analyze <rootfs路径> --input-type rootfs --authorization-holder "设备所有者" --run-id <本次任务名>
-```
-
-**Windows 示例**：
-
-```powershell
-fsa analyze "C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\_DIR859_FW102b03.bin-0.extracted\squashfs-root" --input-type rootfs --authorization-holder "设备所有者" --run-id dir859_run1
-```
-
-**Linux 示例**：
-
-```bash
-fsa analyze "tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root" --input-type rootfs --authorization-holder "设备所有者" --run-id dir859_run1
+fsa analyze "tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root" \
+  --input-type rootfs --authorization-holder "设备所有者" --run-id dir859_run1
 ```
 
 运行结束会打印报告，并保存到 `runs/dir859_run1/report.md`。
@@ -366,7 +271,7 @@ CLI 负责"找可疑点"，**人工审计负责"确认真漏洞"**。对每个 H
 | 9 | 有平台限制吗？ | 编译开关 / 特定硬件才走此路径？ |
 | 10 | 有矛盾证据吗？ | 证据库里有没有反证？ |
 
-**辅助命令**（WSL 或 Linux 内）：
+**辅助命令**：
 
 ```bash
 strings <binary> | grep -E "system|popen|%s|reboot"   # 找命令模板
@@ -384,7 +289,7 @@ readelf -s <binary> | grep system                       # 确认导入
 想在 QEMU 里证明漏洞真的能触发：
 
 ```bash
-# WSL 或 Linux 内，qemu 用户态模式（适合单程序）
+# qemu 用户态模式（适合单程序）
 qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 ```
 
@@ -415,7 +320,6 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
 | `python scripts/run_e2e.py --fixture-mode ...` | 合成样本回归（必须显式确认 fixture 模式） | 演练产物 |
 | `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
-| `bash scripts/setup_wsl.sh`（WSL 内） | 一键装 Linux 工具链 | — |
 
 ## 配置说明
 
@@ -439,7 +343,7 @@ runtimes:
 ```
 
 ```bash
-export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xxx"
+export OPENAI_API_KEY=sk-xxx
 ```
 
 ## 项目结构
@@ -457,7 +361,7 @@ export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xx
 ├── tmp/                    # 解包产物
 ├── runs/                   # 分析报告与 JSON 产物
 ├── tests/                  # 单元 / 集成测试（CI 不依赖外部重型工具）
-└── docs/                   # 设计文档、WSL 指南、挖洞教程
+└── docs/                   # 设计文档、挖洞教程、外部分析器说明
 ```
 
 ## Skill 体系
@@ -508,21 +412,21 @@ RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描�
 
 ```bash
 python scripts/dev.py test    # 确定性单元测试（CI 主门）
-python scripts/dev.py test-all # 含可选 WSL/Linux 工具集成测试
+python scripts/dev.py test-all # 含可选宿主工具集成测试
 python scripts/dev.py lint    # ruff 全绿
 ```
 
 - 单元测试覆盖：Schema / 工具 / 编排 / Verifier / 评分 / 动态验证 / Skill 加载 / e2e
 - 金标准回归：9 个 CVE fixture 全部通过 Schema 校验
-- 集成测试：`tests/integration/`（解包/攻击面，依赖 WSL/Docker 时自动 skip）
+- 集成测试：`tests/integration/`（解包/攻击面，依赖宿主工具缺失时自动 skip）
 
 ## 常见问题（FAQ）
 
-**Q1：Windows 上没有 binwalk，能跑吗？**
-能。单元测试与静态分析是纯 Python；只有真实固件解包需要 Linux 工具，用 WSL2 一条命令解包后，Windows 侧分析。
+**Q1：为什么只支持 Linux？**
+解包（binwalk/sasquatch）与动态验证（QEMU）本身就是 Linux 工具链；移除 Windows/WSL 适配层后，代码里不再有路径翻译与 `.bat` 壳，行为更可预测。Windows 用户可用容器或远程 Linux 主机。
 
-**Q2：解包时符号链接报错 / 目录打不开？**
-真实固件 rootfs 含 Linux 符号链接（如 `tmp -> /dev/null`），Windows 无法 stat。CLI 已做符号链接容错（`fsa/utils/traverse.py`），直接分析即可，无需手动清理。
+**Q2：解包时遇到打不开的符号链接？**
+真实固件 rootfs 含指向 `/dev/null` 的悬空链接。CLI 已做符号链接容错（`fsa/utils/traverse.py`），直接分析即可，无需手动清理。
 
 **Q3：怎么接入国产大模型？**
 编辑 `config/models.yaml` 的 `openai_compatible` 段，设置 `OPENAI_API_KEY` 环境变量，`config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时只返回明确的 degraded 状态，不生成替代模型结论。
@@ -533,10 +437,7 @@ python scripts/dev.py lint    # ruff 全绿
 **Q5：报告里会不会出现可武器化内容？**
 不会。Skill 07 强制 8 项合规扫描 + 脱敏渲染，真实 IP / 反弹 shell 等以占位符替代；未标记 `poc_sanitized=true` 的外部验证证据会被拒绝。
 
-**Q6：WSL 服务不稳定（0x8007274c）？**
-`wsl --shutdown` 后重试；或直接改用纯 Linux 路线（路线 B）。
-
-**Q7：怎么查看报告？**
+**Q6：怎么查看报告？**
 `runs/<任务名>/report.md` 是 Markdown；`analysis.json` 是结构化结果。也可以把 report.md 交给 WorkBuddy 渲染成网页。
 
 ## 许可证

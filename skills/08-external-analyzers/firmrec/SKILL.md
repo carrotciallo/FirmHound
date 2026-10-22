@@ -129,7 +129,7 @@ external:
 | benchmark fixture 是抽象的 | `binary_id = bin-CVE-xxxx` 非真实路径 | 做映射表，明写推定字段（`vuln_info_mapping.md`） |
 | 容器内 curl 被拉黑 | 调模型失败 | 宿主机侧 Python 预取后写进 `inout/`，避开容器内网络调用 |
 | 合成固件是 x86 | FirmRec 主打 MIPS/ARM | 记录是否支持；不支持则 L1 不作为验收必需项（comparison 注明） |
-| Windows 挂载失败 | `docker: invalid mount config` | 走 `to_wsl_path()` 翻 `/mnt/c/...`；Docker Desktop 开该盘 file sharing |
+| 挂载失败 | `docker: invalid mount config` | 确认宿主路径存在、Docker 有权访问该目录；Linux 下无需路径翻译 |
 | PoC 含危险 payload | 落盘即违规 | `poc_info` 全经 `sanitize_poc`，拒绝的直接丢弃（`dropped_unsafe` 计数） |
 
 ---

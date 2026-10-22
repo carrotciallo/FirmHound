@@ -80,7 +80,7 @@ def test_probe_does_not_raise():
     analyzer = KleeAnalyzer({})
     probe = analyzer.probe()
     assert isinstance(probe.available, bool)
-    assert probe.backend in {"wsl", "local", "docker"}
+    assert probe.backend in {"local", "docker"}
 
 
 # --------------------------------------------------------------------------- #

@@ -55,7 +55,6 @@ def _test_config(tmp_path: Path) -> Path:
                 "verify_top_k": 5,
             },
             "external": {"enabled": False},
-            "tools": {"use_wsl_wrappers": False},
         },
     )
     return config_path

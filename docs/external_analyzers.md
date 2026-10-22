@@ -72,4 +72,4 @@ python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/
 
 CI 运行确定性单元测试、Schema 示例校验、8 种开关降级测试、lint、外部探测以及
 `--depth full` 全关闭回归。主机相关解包集成测试使用 `python scripts/dev.py integration`
-单独运行，避免 Windows WSL 服务异常拖死基础 CI。
+单独运行，避免重型容器/工具拖死基础 CI。

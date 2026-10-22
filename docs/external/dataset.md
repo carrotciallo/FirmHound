@@ -6,12 +6,12 @@
 
 ## L1 — 合成固件（自带 C 源码，KLEE wllvm 路径必需）
 
-- **生成**：`bash scripts/e2e/build_firmware.sh`（在 WSL `Ubuntu-22.04` 内跑）
-- **输出**：`/mnt/c/temp/fw_demo`（含编译后的 `rootfs/bin/httpd`，`httpd.c` 用
+- **生成**：`bash scripts/e2e/build_firmware.sh`
+- **输出**：`tmp/fw_demo`（含编译后的 `rootfs/bin/httpd`，`httpd.c` 用
   `getenv → sprintf → system` 注入命令注入）
 - **SHA256**：每次 build 不同（源码固定，但打包时间戳会变），以**解包后 rootfs** 为准
 - **用途**：SaTC/KLEE/BOND 的全链路冒烟；KLEE 需要 C 源码走 wllvm 生成 LLVM bitcode
-- **状态**：✅ 脚本存在，待在 WSL 内生成
+- **状态**：✅ 脚本存在，可本地生成
 
 ## L2 — DIR-859 真实固件（现场即有）
 
@@ -29,7 +29,7 @@
 
 | 固件 | 型号/版本 | 来源 URL | SHA256 | 大小 | 架构 | 状态 |
 |---|---|---|---|---|---|---|
-| L3-a | Tenda AC15 `US_AC15V1.0BR_V15.03.05.19_multi_TD01` | https://down.tenda.com.cn/uploadfile/AC15/US_AC15V1.0BR_V15.03.05.19_multi_TD01.zip | PENDING（Windows 沙箱 + WSL 均被拦截，需 8/31 真机/公网机器） | PENDING | MIPS 小端（待解包确认） | 🔶 待 8/31 机器下载（沙箱与 WSL 均无法连通 down.tenda.com.cn） |
+| L3-a | Tenda AC15 `US_AC15V1.0BR_V15.03.05.19_multi_TD01` | https://down.tenda.com.cn/uploadfile/AC15/US_AC15V1.0BR_V15.03.05.19_multi_TD01.zip | PENDING（开发沙箱出站被拦截，需在有公网的机器下载） | PENDING | MIPS 小端（待解包确认） | 🔶 待在公网机器下载（沙箱无法连通 down.tenda.com.cn） |
 | L3-b | Netgear R7000 `R7000-V1.0.11.100_10.2.100` | https://www.downloads.netgear.com/files/GDC/R7000/R7000-V1.0.11.100_10.2.100.zip | `7d2f704c1b132b22b512be308515b6d0a9f996a8ebcb750bd0504d329279204a` | 31,653,946 B | ARM 32-bit little-endian (Broadcom BCM4709 / Cortex-A9) | ✅ 已下载 + 已解包（squashfs-root 1572 文件） |
 
 > 解包后内部镜像：
@@ -41,7 +41,7 @@
 下载脚本已升级为**一键入口** `scripts/download_l3_firmware.py`（纯标准库、跨平台、幂等可重复跑），一条命令串起三件事：
 **下载 → (binwalk 解包 + 从 ELF 自动识别架构) → 回填本表**。
 
-- 解包走 **WSL `Ubuntu-22.04` 的 binwalk/sasquatch**（本项目 binwalk 装在 WSL；原生 `binwalk` 仅作降级），自动解到 `tmp/unpacked/<fw>.extracted/squashfs-root`，adapter `_resolve_rootfs` 自动定位。
+- 解包走宿主机的 `binwalk`/`sasquatch`，自动解到 `tmp/unpacked/<fw>.extracted/squashfs-root`，adapter `_resolve_rootfs` 自动定位。
 - 架构识别：扫描解包后 rootfs 里的 ELF（优先 `bin/busybox`），读 ELF 头 machine/class/endian 得出。
 - 回填：按行首 `| L3-a |` / `| L3-b |` 定位本表对应行，只改 SHA256 / 大小 / 架构 / 状态 单元格，不动型号/URL。
 
@@ -53,7 +53,7 @@ python scripts/download_l3_firmware.py --check    # 仅测连通性，不下载
 python scripts/download_l3_firmware.py --skip-backfill   # 解包但不改动 dataset.md
 ```
 
-> 本脚本在本沙箱已用已下载的 Netgear R7000 跑通验证（跳过下载 → 找到既有 squashfs-root → 识别 ARM 32-bit LE → 回填成功）；Tenda 因沙箱/WSL 双重拦截会在本机跳过，8/31 真机可正常下载并补全。
+> 本脚本在本沙箱已用已下载的 Netgear R7000 跑通验证（跳过下载 → 找到既有 squashfs-root → 识别 ARM 32-bit LE → 回填成功）；Tenda 因开发沙箱出站拦截会在本机跳过，需在有公网的机器上补跑。
 
 手动（curl 备选，仅当脚本不可用）：
 
@@ -69,10 +69,10 @@ curl -L -o firmware_samples/R7000_V1.0.11.100_10.2.100.zip \
 unzip -o firmware_samples/R7000_V1.0.11.100_10.2.100.zip -d firmware_samples/
 
 # 再手动解包 + 识别架构 + 回填（脚本已自动完成，这里是等价手工步骤）
-wsl -d Ubuntu-22.04 -e bash -c "cd /mnt/d/<项目根> && python3 -m binwalk -e -C tmp/unpacked firmware_samples/<image>"
+python3 -m binwalk -e -C tmp/unpacked firmware_samples/<image>
 ```
 
-> **沙箱出站说明**：开发沙箱允许通用 HTTPS（如 `example.com` → 200），但**拦截了 `down.tenda.com.cn`**（Windows 沙箱 TLS 握手被重置；已额外验证 WSL `Ubuntu-22.04` 同样无法连通，curl 134s 连接超时），故 **Tenda AC15 必须依赖 8/31 真机 / 有公网机器** 才能下载；`downloads.netgear.com` 在本沙箱用 Python `urllib` 可正常拉取（curl / PowerShell 因 schannel / .NET 的 TLS 被代理拦截而失败），故 R7000 已先行下载并解包到位。
+> **沙箱出站说明**：开发沙箱允许通用 HTTPS（如 `example.com` → 200），但**拦截了 `down.tenda.com.cn`**（TLS 握手被重置，curl 连接超时），故 **Tenda AC15 必须依赖 8/31 真机 / 有公网机器** 才能下载；`downloads.netgear.com` 在本沙箱用 Python `urllib` 可正常拉取（curl 因 TLS 被代理拦截而失败），故 R7000 已先行下载并解包到位。
 
 ## 共享约定
 

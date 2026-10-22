@@ -7,8 +7,7 @@ FirmRec / KLEE / BOND）共用同一批固件，结果才可比。
 
 本脚本是 **一键执行入口**，把三件事串起来（均幂等，可重复跑）：
   1. 下载固件 zip（Python urllib，沙箱被拦截时优雅跳过）
-  2. 解包出 .bin/.chk → `binwalk -e` 解包到 `tmp/unpacked/`（优先走 WSL 的 binwalk，
-     原生 binwalk 作降级）→ 从解包后的 ELF 自动识别架构
+  2. 解包出 .bin/.chk → `binwalk -e` 解包到 `tmp/unpacked/` → 从解包后的 ELF 自动识别架构
   3. 把 SHA256 / 大小 / 架构 / 解包状态 回填 `docs/external/dataset.md` 的 L3 表
 
 用法（在 **8/31 机器**，有真实公网 egress 的环境里跑）：
@@ -73,13 +72,6 @@ def sha256_of(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def to_wsl(p: Path) -> str:
-    """把 Windows 路径转成 WSL 路径，如 D:/a/b -> /mnt/d/a/b。"""
-    drive = p.drive.lower()[0]
-    rest = p.as_posix()[2:]  # 去掉 "D:"，保留 "/揭榜挂帅.../..."
-    return f"/mnt/{drive}{rest}"
 
 
 def run(cmd) -> int:
@@ -160,16 +152,7 @@ def find_rootfs(image: Path) -> Path | None:
 
 
 def binwalk_unpack(image: Path) -> Path | None:
-    """用 binwalk 解包到 tmp/unpacked。优先 WSL（本项目 binwalk 装在 WSL），降级原生。"""
-    # 1) WSL Ubuntu-22.04（本机 binwalk/sasquatch 所在）
-    proj_wsl = to_wsl(ROOT)
-    img_wsl = to_wsl(image)
-    wsl_cmd = f"cd '{proj_wsl}' && python3 -m binwalk -e -C tmp/unpacked '{img_wsl}'"
-    if run(["wsl", "-d", "Ubuntu-22.04", "-e", "bash", "-c", wsl_cmd]) == 0:
-        rf = find_rootfs(image)
-        if rf:
-            return rf
-    # 2) 原生 binwalk 降级
+    """用 binwalk 解包到 tmp/unpacked。"""
     for native in (
         ["binwalk", "-e", "-C", str(UNPACK_DIR), str(image)],
         ["python3", "-m", "binwalk", "-e", "-C", str(UNPACK_DIR), str(image)],
@@ -178,7 +161,7 @@ def binwalk_unpack(image: Path) -> Path | None:
             rf = find_rootfs(image)
             if rf:
                 return rf
-    print("  ! binwalk 解包未产出 squashfs-root（检查 WSL/原生 binwalk 是否可用）")
+    print("  ! binwalk 解包未产出 squashfs-root（检查 binwalk 是否可用）")
     return None
 
 

@@ -254,7 +254,7 @@ def prune(candidate, symex_result) -> dict:
 
 | 时间 | 任务 |
 |---|---|
-| 09:00–11:00 | 写 `runner.py`：wsl/local 后端，拼 klee 命令，硬超时（`--max-time`） |
+| 09:00–11:00 | 写 `runner.py`：local/docker 后端，拼 klee 命令，硬超时（`--max-time`） |
 | 11:00–15:00 | 写 `parser.py`：**7 类 `.err` + `.ktest` + `info` + `run.stats` + `warnings.txt`** |
 | 15:00–18:00 | 写 `prune.py`（含误杀防护三条约束） |
 | 18:00–20:00 | 单测：harness 生成器 + parser 六类分支 |
@@ -419,7 +419,7 @@ H 会优先消费**你判定 `reachable=true` 且带 `witness_input` 的候选**
 | **KLEE 版本/LLVM 不匹配** | 装不上 | 优先用**官方 Docker 镜像**（已配好 LLVM 16 + Z3），别自己编译 LLVM |
 | **`model.err` 被误当成漏洞** | 误报反而变多 | parser 里显式把 `model.err`/`exec.err` 路由到 `limitation`（单测覆盖） |
 | harness 建模过度简化导致误杀 | 剪枝率异常高 | 抽检 + `harness_version` 可追溯 + 只写反证不删候选 |
-| Windows 侧跑不了 | KLEE 无 Windows 支持 | 走 `wsl` 后端；或用 Docker Desktop |
+| 宿主没有 KLEE | 未安装 LLVM 16 + Z3 | 按官方文档安装，或 `backend: docker` |
 
 ---
 

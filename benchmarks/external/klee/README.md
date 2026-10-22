@@ -29,7 +29,7 @@
 
 - **代码 / 单测**：Full（23 用例绿，覆盖 parser 六类分支 + harness 生成 + 降级 + X2 误杀防护）。
 - **真实符号执行（F1/F2/F6/F9）**：Part（本机 Docker 文件共享损坏 + 未装 KLEE，真实运行推迟到
-  8/31 机器任务；代码与 harness 生成器已就绪，到机器上 `backend=wsl` 或 Docker 直接跑）。
+  8/31 机器任务；代码与 harness 生成器已就绪，到机器上 `backend=local` 或 `backend=docker` 直接跑）。
 - **诚实归因**：S3 二进制提升若 4h 内拿不到可用 bitcode，记为 limitation，不编造结果。
 
 ## 文件
