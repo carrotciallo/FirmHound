@@ -18,7 +18,7 @@
 
 | 项 | 最低要求 | 说明 |
 |---|---|---|
-| 系统 | Ubuntu 22.04+ / Debian 系 | 本项目只支持 Linux 原生环境 |
+| 系统 | 任意主流 Linux（Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE、Alpine） | 工具链走 Docker 时发行版无关；本机装 KLEE 需 LLVM 16 工具链 |
 | 内存 | **≥ 16G**（Ghidra 硬门槛） | SaTC 的 Ghidra 管线 `--memory=16g`，不够会 OOM 被 kill |
 | 磁盘 | ≥ 50G 空闲 | 固件 + 解包 rootfs（R7000 约 1.6k 文件）+ 镜像 + KLEE 产物 |
 | 网络 | 公网 egress（可访问 Docker Hub / github / down.tenda.com.cn） | 下载镜像 + Tenda AC15 固件 |
@@ -153,7 +153,7 @@ python scripts/run_external.py --tool firmrec --run-dir runs/r7000_full
 ```bash
 # 方案 A（推荐）：Docker
 docker pull kleever/klee:llvm-16      # LLVM16 + Z3 + KLEE 3.2
-# 方案 B：Linux 原生
+# 方案 B：本机安装（以 Debian/Ubuntu 为例；其他发行版用对应包管理器或官方脚本）
 sudo apt install klee llvm-16* z3 wllvm clang
 ```
 

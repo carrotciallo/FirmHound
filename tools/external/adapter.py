@@ -68,7 +68,7 @@ def _run_context(run_dir: Path) -> dict[str, Any]:
 
     Currently only ``blind`` matters: a blind benchmark run must not load any
     recurrence-only tool (FirmRec), because those tools require known-vuln
-    signatures and would leak ground truth into the benchmark (F-FirmRec.md §4).
+    signatures and would leak ground truth into the benchmark (firmrec.md §4).
     The flag is read from ``<run_dir>/state/task_card.json`` when present.
     """
     blind = False
@@ -92,7 +92,7 @@ def _resolve_external_config(external: dict[str, Any], run_ctx: dict[str, Any]) 
     caller treats a tool whose ``enabled`` flipped to False here as FORCED_DISABLE
     (and records it in the result ``limitation``).
 
-    This is the tested entry point for F-FirmRec.md §4.4 isolation test #1.
+    This is the tested entry point for firmrec.md §4.4 isolation test #1.
     """
     resolved: dict[str, Any] = {}
     for key, value in (external or {}).items():
@@ -212,7 +212,7 @@ def _run_tool(tool: str, run_dir: str | Path, config_path: str | None = None) ->
 
     # Blind-run gate: a recurrence-only tool (FirmRec) that was enabled in config
     # is force-disabled on a blind run. This is the academic-integrity firewall of
-    # F-FirmRec.md §4 -- it must never abort the pipeline, just degrade to skipped.
+    # firmrec.md §4 -- it must never abort the pipeline, just degrade to skipped.
     if (
         run_ctx.get("blind")
         and tool in RECURRENCE_ONLY_TOOLS

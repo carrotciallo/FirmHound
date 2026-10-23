@@ -1,27 +1,22 @@
-# H 同学 · BOND 全量复现与集成计划
+# BOND 接入与复现计划
 
 > **当前实现状态（2026-09-02）**：本文件保留原始研发目标与论文对照；仓库产品路径采用安全子集 mini-BOND：可选真实 Ghidra headless、确定性约束/模板/种子调度、内置限界 HTTP 仿真探针。它不使用 BooFuzz 会话管理，不生成合成 CFG，不把模拟模式写成 finding，也不宣称与论文原型能力等价。实际行为以 `tools/external/bond/runner.py` 和 `benchmarks/external/bond/comparison.md` 为准。
 
-> **你的任务**：把 BOND（USENIX Sec'26，约束导向定向模糊测试）从"论文"做到
-> "能把我们的候选变成可触发证据的验证引擎"。
-> **Plan A（原版复现）与 Plan B（mini-BOND 自研）双线并行，Plan B 是主线。**
+> 目标：把 BOND（USENIX Sec'26，约束导向定向模糊测试）的方法落到本仓库，把候选变成可触发的证据。
+> Plan A（原版复现）与 Plan B（mini-BOND 自研）并行，Plan B 为主线。验收标准见 §2 全量档 9 条。
 >
-> **基调：不是跑通 demo，是全量完成。** 你的验收标准见 §2 全量档 9 条。
->
-> **先说清楚**：你要啃的是四人里风险最高的一个——需要 IDA Pro 7.5 商业授权、
-> 没有 GitHub 只有 Zenodo artifact、论文尚未正式发表、原论文在真机上打黑盒（我们不能）。
-> **但这恰恰是四人里最有价值的一个**：它补的是我们从"疑似"到"确认"之间那段空白。
-> 现在 `skills/06-dynamic-validation` 只定义了 L0–L3 分层和安全门，**没有任何真正的验证实现**。你来填。
+> 风险：Plan A 需要 IDA Pro 7.5 商业授权；上游只有 Zenodo artifact，论文尚未正式发表；原论文在真机上
+> 打黑盒，本项目禁止。`skills/06-dynamic-validation` 目前只有 L0–L3 分层和安全门，没有可执行的验证实现。
 
 ---
 
 ## 1. 三句话讲清 BOND
 
 - **它解决什么**：静态污点分析产出大量报告但缺乏验证。BOND 用"约束引导的定向模糊测试"，把污点报告（source / sink / call trace）变成**真实可触发的 PoC**。
-- **它补我们什么**：我们的候选到 `confirmed-issue` 之间**缺一整段**。现在只能靠人工 10 问，答不了"它真的能触发吗"。
+- **补上的能力**：候选到 `confirmed-issue` 之间**缺一整段**。现在只能靠人工 10 问，答不了"它真的能触发吗"。
 - **它在链条哪**：`CONSTRAINED_VALIDATION` 阶段，只吃经 KLEE 剪枝后**存活**的高价值候选。
 
-### 1.1 论文的四个机制（答辩要讲清楚）
+### 1.1 论文的四个机制（技术评审要点）
 
 1. **入口点识别**：在 CFG/CG 上**后向遍历**找隐藏的调度结构（如 `websFormDefine("SetWan", func)`），提取关键字，圈出可达区域。
 2. **多维约束提取**：过程间数据流跟踪，把路径约束分三类（**强制 / 部分 / 无约束**），映射为六种高级语义类型。
@@ -36,7 +31,7 @@
 
 ## 2. 交付标准（三档）
 
-### 全量档（Full）—— 你的目标
+### 全量档（Full）
 
 | # | 项 | 具体判定 |
 |---|---|---|
@@ -50,7 +45,7 @@
 | **F8** 文档全量 | SKILL.md 含 7 节 + 踩坑表 + **Plan A/B 对比 + 安全约束说明** | 文档齐 |
 | **F9** 性能基线 | 每候选的 fuzz 耗时、请求数、触发耗时、仿真环境开销 | 基线表 |
 
-### 你的独有交付
+### 本工具独有的交付
 
 | # | 项 | 说明 |
 |---|---|---|
@@ -77,29 +72,29 @@
 | 输出 | `Bond_result/action_find/`（入口点）、`custom_analysis/`（路径约束）、`fuzz_log/fuzz_sent_log.txt`（PoC） |
 | 输入 | 固件二进制 + **污点分析报告**（source / sink / call traces） |
 
-### 3.1 Plan A 的风险清单（你要在 8/30 18:00 前给出结论）
+### 3.1 Plan A 的风险清单（开工前给出结论）
 
 | # | 风险 | 判定问题 |
 |---|---|---|
-| A1 | **IDA Pro 7.5 商业授权** | 学校/实验室能不能拿到？**今天必须问清楚** |
+| A1 | **IDA Pro 7.5 商业授权** | 能否取得合法授权？**需在开工前确认** |
 | A2 | 无 GitHub，只有 Zenodo | artifact 是否完整？`third_party/` 的 patched 库在不在？ |
-| A3 | patched angr / patched BooFuzz | 需要我们替换掉已装的库，**会不会污染现有环境**？（建议：独立 venv 或容器） |
+| A3 | patched angr / patched BooFuzz | 需要替换已安装的库，**会不会污染现有环境**？（建议：独立 venv 或容器） |
 | A4 | Python 3.7 + Java 8 老环境 | 与现代依赖冲突能否解决？ |
-| A5 | 原论文打**真实设备** | 我们**不能**这么做（安全红线），只能打仿真 |
+| A5 | 原论文打**真实设备** | 本项目**不**这么做（安全红线），只能打仿真 |
 
 ---
 
-## 4. Plan B：mini-BOND（你的主线，全量实现）
+## 4. Plan B：mini-BOND（主线实现）
 
-> **核心判断**：论文真正的贡献不是 IDA，而是「**约束提取 → 优先级变异**」这个方法论。
-> 我们有 Ghidra、有自己的 `candidates.json`、有 LLM 运行时。**方法论是论文的，实现是我们的。**
+> **要点**：论文的贡献在「**约束提取 → 优先级变异**」这套方法，不在 IDA。
+> 本仓库有 Ghidra、有 `candidates.json`、有 LLM 运行时，方法沿用论文，实现自研。
 
 ### 4.1 组件替换表
 
 | 原版组件 | mini-BOND 替代 | 说明 |
 |---|---|---|
 | IDA Pro 7.5 的 CFG/CG | **Ghidra headless 脚本导出** CFG/CG/函数表/字符串 | E 已经在 SaTC 轨装了 Ghidra，**直接复用，别重跑** |
-| EmTaint（patched angr）的污点报告 | **我们自己的 `candidates.json` + SaTC 结果** | 归一化成 `source/sink/call_trace`，格式已由契约定好 |
+| EmTaint（patched angr）的污点报告 | **本项目的 `candidates.json` + SaTC 结果** | 归一化成 `source/sink/call_trace`，格式已由契约定好 |
 | BooFuzz（patched 变异逻辑） | **官方 BooFuzz + 外层约束优先级调度** | **不改 BooFuzz 源码**，把约束翻译成"变异种子生成规则"，规避 patched 库地狱 |
 | LLM 生成 HTTP 模板 | **`fsa/runtime/openai_compatible.py`**（国内备案模型） | 现成能力，写 prompt 模板即可 |
 | 真实设备黑盒 | **QEMU system / FirmAE 仿真实例，私有网段** | 合规。复用 `tools/emulation/` 已有封装 |
@@ -139,7 +134,7 @@ def export_cfg_cg(binary: Path, out_json: Path) -> dict:
 | **partial** | 满足能到达更深的分支 | `deref(v4)=="Yes"` | 次高 |
 | **none** | 不影响的路径（如直接进 printf） | `v5->printf` | 最低，随机变异 |
 
-**六种语义类型**（前四种对应论文，后两种是我们为 IoT 场景补的，**要注明**）：
+**六种语义类型**（前四种对应论文，后两种是为 IoT 场景补充的，**要注明**）：
 
 | 语义 | 含义 | 例子 |
 |---|---|---|
@@ -147,8 +142,8 @@ def export_cfg_cg(binary: Path, out_json: Path) -> dict:
 | `numeric_range` | 数值范围 | `atoi(v3)∈(0,1500]` |
 | `null_check` | 空/非空 | `v0==null && v1~v6!=null` |
 | `byte_check` | 字节级校验 | 特定偏移的字节值 |
-| `length_bound` | 长度界（**我们补充**） | 从栈帧 buffer 大小推断 |
-| `net_format` | 网络格式（**我们补充**） | IP / MAC / URL 格式 |
+| `length_bound` | 长度界（**本项目补充**） | 从栈帧 buffer 大小推断 |
+| `net_format` | 网络格式（**本项目补充**） | IP / MAC / URL 格式 |
 
 **产出**（直接对应 `external_finding.constraints[]`）：
 ```json
@@ -188,7 +183,7 @@ def generate_seeds(constraints):
     """
 ```
 
-**关键**：不改 BooFuzz 源码。我们只在外层生成"种子请求序列"，交给 BooFuzz 做会话管理。
+**关键**：不改 BooFuzz 源码。本实现只在外层生成"种子请求序列"，交给 BooFuzz 做会话管理。
 
 ### 4.4 探针白名单（与 `skills/06-dynamic-validation` 一致）
 
@@ -230,23 +225,23 @@ def sanitize_poc(raw: str) -> tuple[str, bool]:
 
 ## 6. 逐日排期（8/30 13:00 起）
 
-### 8/30（半天 + 晚上）—— Plan A 定性 + Plan B 起步
+### 阶段 0 · Plan A 定性与 Plan B 起步
 
 | 时间 | 任务 | 产出 |
 |---|---|---|
 | 13:00–14:00 | 读 `README.md` §3 共享契约 | — |
 | **14:00–16:00** | **Plan A 定性（最高优先级）**：下 Zenodo artifact，`git`-free 检查完整性；**同时去问 IDA Pro 授权** | **完整性检查报告** |
 | **16:00–18:00** | **给出 Plan A 的明确结论**：能跑 / 缺什么（写清单） | **`benchmarks/external/bond/plan_a_assessment.md`** ⚠ 18:00 死线 |
-| 18:00–19:00 | 装 mini-BOND 环境：Ghidra（复用 E 的）、BooFuzz、QEMU/FirmAE | 环境就位 |
+| 18:00–19:00 | 装 mini-BOND 环境：Ghidra（复用已有安装）、BooFuzz、QEMU/FirmAE | 环境就位 |
 | 19:00–22:00 | 写 `sanitize.py` + 单测（**全组依赖，优先做**） | 脱敏器可用 |
 | 22:00–24:00 | 起仿真环境：把 L1 合成固件的 httpd 跑在 QEMU 上，确认能收到 HTTP 响应 | 仿真环境通 |
-| 21:00 | 四人同步会（**会上报 Plan A 结论**） | — |
+| 21:00 | 契约同步会（**会上报 Plan A 结论**） | — |
 
 **今日硬产出**：Plan A 结论文档 + `sanitize.py`（含全红线单测）+ 仿真环境能对 L1 固件发请求。
 
 > ⚠️ **Plan A 的 IDA 问题今天必须问到答案**。拿不到就**立刻全力转 Plan B**，不要再花时间。
 
-### 8/31 —— Plan B 模块全量实现
+### 阶段 1 · Plan B 模块实现
 
 | 时间 | 任务 |
 |---|---|
@@ -258,7 +253,7 @@ def sanitize_poc(raw: str) -> tuple[str, bool]:
 
 **今日硬产出**：mini-BOND 三模块可用；L1 合成固件跑通并触发。
 
-### 9/1 —— Parser + 单测日
+### 阶段 2 · Parser 与单测
 
 | 时间 | 任务 |
 |---|---|
@@ -268,18 +263,18 @@ def sanitize_poc(raw: str) -> tuple[str, bool]:
 | 18:00–20:00 | **安全门单测**：公网 IP / 未授权 / 无基线三种情形均 `unsafe` 且零外发 |
 | 20:00–21:00 | `pytest --cov` ≥80% |
 
-### 9/2 —— 接入 + 联调日（⚠ 18:00 熔断）
+### 阶段 3 · 接入与联调（18:00 收口）
 
 | 时间 | 任务 |
 |---|---|
 | 09:00–11:00 | registry 声明；`run_external.py --tool bond` 跑通 |
-| 11:00–13:00 | 与 G 对接：消费 KLEE 判 `reachable=true` 的候选（**这是你的输入源**） |
+| 11:00–13:00 | 与 KLEE 对接：消费 `reachable=true` 的候选（**输入源**） |
 | 13:00–16:00 | `CONSTRAINED_VALIDATION` 阶段接入；`--depth full` 全链路跑通 |
 | 16:00–17:00 | 8 种开关组合降级测试 |
 | 17:00–18:00 | 把 `sanitize.py` 交付给 F（他的 `poc_info` 要用） |
-| **18:00** | **熔断评审**：按 §2 三档给自己定档 |
+| **18:00** | **阶段收口评审**：按 §2 三档核对实际完成度 |
 
-### 9/3 —— 量化 + 文档日
+### 阶段 4 · 量化与文档
 
 | 时间 | 任务 |
 |---|---|
@@ -287,17 +282,17 @@ def sanitize_poc(raw: str) -> tuple[str, bool]:
 | 15:00–18:00 | 写 `benchmarks/external/bond/comparison.md`（含 **Plan A 评估**） |
 | 18:00–20:00 | 写 `skills/08-external-analyzers/bond/SKILL.md`（7 节 + 踩坑表 + Plan A/B 对比 + 安全约束） |
 
-### 9/4 —— 冻结 + 演示日
+### 阶段 5 · 冻结与演示
 
 - 代码冻结
 - **演示素材（全场最强）**：「KLEE 证明可达 → BOND 触发 → 报告判定 confirmed-issue」完整闭环
-- 答辩 Q&A 预案（见 §9）
+- 设计质询 Q&A 预案（见 §9）
 
 ---
 
 ## 7. 代码骨架
 
-### 7.1 文件清单（你负责）
+### 7.1 实现范围
 
 ```
 tools/external/bond/__init__.py
@@ -317,7 +312,7 @@ tests/unit/test_sanitize.py                 # ★ 全红线覆盖
 tests/unit/test_constraint.py
 skills/08-external-analyzers/bond/SKILL.md
 benchmarks/external/bond/{README.md,comparison.md,plan_a_assessment.md,raw/}
-docs/external/H-BOND.md
+docs/external/bond.md
 ```
 
 ### 7.2 parser.py 映射表
@@ -342,10 +337,9 @@ docs/external/H-BOND.md
 
 `poc_sanitized` 为 `false` 的条目**一律不许落盘**（代码层过滤 + 单测断言）。
 
-### 7.3 与 G 的接口（11:00–13:00 对接）
+### 7.3 与 KLEE 的接口
 
-G 会给你 `symex.reachable=true` 且带 `witness_input` 的候选。
-你**优先消费这批**（KLEE 已经替你筛过一轮）。
+KLEE 输出 `symex.reachable=true` 且带 `witness_input` 的候选，这批优先消费（已筛过一轮）。
 
 ---
 
@@ -394,22 +388,21 @@ def test_no_baseline_aborts(): ...
 
 ---
 
-## 9. 答辩 Q&A 预案（**你最需要准备充分**）
+## 9. 设计质询 Q&A
 
-**Q：BOND 要 IDA Pro，你们有授权吗？**
-A：没有商业授权。所以我们第一天就并行做了 **mini-BOND**：Ghidra headless 替 IDA 导出 CFG/CG、
-我们自己的 `candidates.json` 替 EmTaint 的污点报告、官方 BooFuzz + 外层约束优先级调度替 patched 库、
-QEMU/FirmAE 仿真替真机。**论文的四个机制（入口点识别、可达区域划分、约束提取、优先级变异）我们全实现了，
-只是换掉了底层依赖。** 我们还出了一份 Plan A 的缺口清单，说明原版 artifact 缺什么。
+**Q：BOND 需要 IDA Pro，有授权吗？**
+A：没有商业授权，因此并行做了 **mini-BOND**：Ghidra headless 替 IDA 导出 CFG/CG、
+自有 `candidates.json` 替 EmTaint 的污点报告、官方 BooFuzz + 外层约束优先级调度替 patched 库、
+QEMU/FirmAE 仿真替真机。**论文的四个机制（入口点识别、可达区域划分、约束提取、优先级变异）均已实现，只替换了底层依赖。**
+另附一份 Plan A 缺口清单，说明原版 artifact 缺什么。
 
-**Q：那你们复现的还算 BOND 吗？**
-A：复现的是**方法论**不是二进制。论文的消融实验证明，价值来自"约束分析"模块（召回率 15% → 82%），
-而不是来自 IDA。我们把这一层完整实现了，并且把它接进了我们自己的候选体系——**反而比原版更贴合我们的系统**，
-因为它直接消费我们的输出，形成闭环。
+**Q：这套实现还算 BOND 复现吗？**
+A：复现对象是**方法论**，二进制不必一致。论文消融实验显示，价值来自"约束分析"模块（召回率 15% → 82%），
+与 IDA 无关。这一层已完整实现并接入自有候选体系：直接消费本仓库输出，链路闭合。
 
-**Q：论文是在真设备上打的，你们怎么做？**
-A：**我们不做**。这违反我们的安全红线（《详细计划》第二十六条：不对真实设备、公网或未授权目标做主动测试）。
-我们的 `target` 配置项只允许 `emulation`，代码层硬断言目标 IP 必须在私有网段，
+**Q：论文在真设备上验证，这里怎么做？**
+A：不做。这违反安全红线：不对真实设备、公网或未授权目标做主动测试。
+`target` 配置项只允许 `emulation`，代码层硬断言目标 IP 必须在私有网段，
 否则直接 `unsafe` 中止、零外发流量。三种违规情形都有单测覆盖。
 
 **Q：PoC 进报告会不会有合规问题？**
@@ -418,8 +411,8 @@ A：不会。所有 PoC 必须过 `sanitize.py`，真实 IP 脱敏为占位符�
 `poc_sanitized == false` 的条目一律不许落盘，这一条已纳入报告合规扫描。
 
 **Q：如果 fuzz 没触发是不是说明没有漏洞？**
-A：**不是**。我们的规则是"**只降级不否决**"：未触发只写 `decisive_missing_fact = "constrained fuzzing did not trigger; needs manual review"`，
-裁决动作是 `NEED_DYNAMIC` 而不是 `REJECT`。fuzz 没触发 ≠ 没有洞。
+A：不能这样推断。规则是"**只降级不否决**"：未触发只写 `decisive_missing_fact = "constrained fuzzing did not trigger; needs manual review"`，
+裁决动作取 `NEED_DYNAMIC`，不取 `REJECT`。fuzz 没触发 ≠ 没有洞。
 
 ---
 
@@ -430,8 +423,8 @@ A：**不是**。我们的规则是"**只降级不否决**"：未触发只写 `d
 | **IDA 拿不到** | Plan A 直接卡死 | **8/30 18:00 死线**，拿不到立刻全力转 Plan B |
 | Zenodo artifact 缺件 | `third_party/` 里的 patched 库不在 | 记进 `plan_a_assessment.md`，这份清单本身有价值 |
 | Python 3.7 / Java 8 老环境 | 与现代依赖冲突 | Plan A 用独立 venv 或容器隔离，**别污染现有环境**；Plan B 无此问题 |
-| **BooFuzz 请求被前端直接丢弃** | 全部请求返回 404/400 | 这正是论文要解决的问题——**模板必须对**（method/入口关键字位置/参数格式）。先手工构造一个能通的请求做基线，再让 fuzz 在其上变异 |
-| 仿真环境起不来 | QEMU/FirmAE 跑不起固件 | 复用 `tools/emulation/` 已有封装和 `06-dynamic-validation` 的三大坑（br0 ioctl、/dev/nvram、假监听）；起不来就记 limitation，**降级为 skipped 而不是失败** |
+| **BooFuzz 请求被前端直接丢弃** | 全部请求返回 404/400 | 论文针对的正是这个问题：**模板必须对**（method/入口关键字位置/参数格式）。先手工构造一个能通的请求做基线，再让 fuzz 在其上变异 |
+| 仿真环境起不来 | QEMU/FirmAE 跑不起固件 | 复用 `tools/emulation/` 已有封装和 `06-dynamic-validation` 的三大坑（br0 ioctl、/dev/nvram、假监听）；起不来就记 limitation，**降级为 skipped，不计失败** |
 | LLM 模板不可用 | 模型超时/返回不合规 | **必须有规则兜底**（从 `attack_surface.json` 拼）。模块不许因 LLM 挂掉而整体失败 |
 | 约束提取不准 | 全判成 `none`，等于没约束 | 优先保证 **mandatory 的 null_check 和 string_eq**（这两个最容易提且影响最大）；`numeric_range` 可后置 |
 | 目标 IP 被判非私有 | 安全门拦截 | **这是正确行为**，检查仿真网络配置（NAT + host-only），不要去改安全策略 |
@@ -450,5 +443,3 @@ A：**不是**。我们的规则是"**只降级不否决**"：未触发只写 `d
 
 ---
 
-*你填的是这个系统最后一块空白：从"疑似"到"确认"。*
-*风险最高，但闭环一旦跑通，这就是全场最有说服力的一段演示。*

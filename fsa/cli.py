@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from fsa.orchestrator.engine import Orchestrator, validate_run_id
 from fsa.schemas.loader import validate_all_examples
 from fsa.utils.jsonio import load_json, load_yaml
+from fsa.utils.platform_info import detect as detect_platform
+from fsa.utils.platform_info import hint_for
 from tools.firmware.diagnose import diagnose_firmware
 from tools.report.explain import build_evidence_ledger, render_ledger_markdown
 
@@ -295,11 +297,27 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
     }
 
     required_commands = ["python"]
-    optional_commands = ["docker", "binwalk", "unsquashfs", "analyzeHeadless", "klee"]
+    optional_commands = ["docker", "binwalk", "unsquashfs", "sasquatch", "7z", "readelf", "klee"]
     command_checks = {cmd: bool(shutil.which(cmd)) for cmd in required_commands + optional_commands}
+    missing_commands = [
+        cmd for cmd in required_commands + optional_commands if not command_checks[cmd]
+    ]
     checks["commands"] = {
         "status": "ok" if all(command_checks[cmd] for cmd in required_commands) else "failed",
         "available": command_checks,
+        "missing": missing_commands,
+        "install_hints": {cmd: hint for cmd in missing_commands if (hint := hint_for(cmd))},
+    }
+
+    platform_info = detect_platform()
+    checks["platform"] = {
+        "status": "ok" if platform_info.supported else "degraded",
+        **platform_info.as_dict(),
+        "note": (
+            "any mainstream Linux distribution is supported"
+            if platform_info.supported
+            else "FirmHound targets Linux; on other hosts only the pure-Python analysis layer runs"
+        ),
     }
 
     if include_external_probes:
@@ -335,7 +353,28 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
                 }
         checks["external"] = {"status": _status_from_checks(tools), "tools": tools}
 
-    _emit({"status": _status_from_checks(checks), "checks": checks}, json_output)
+    overall = _status_from_checks(checks)
+    if json_output:
+        _emit({"status": overall, "checks": checks}, True)
+        return
+
+    click.echo(f"status: {overall}")
+    click.echo(
+        f"platform: {platform_info.family} · {platform_info.distro_name}"
+        f" · {platform_info.package_manager} · {platform_info.libc}"
+    )
+    for name in ("paths", "schemas", "runtime", "commands"):
+        item = checks.get(name)
+        if item is None:
+            continue
+        detail = ""
+        if name == "commands" and item["missing"]:
+            detail += f"（可选工具缺: {', '.join(item['missing'])}）"
+            hints = item.get("install_hints") or {}
+            if hints:
+                joined = "; ".join(f"{cmd} → {hint}" for cmd, hint in hints.items())
+                detail += f" 安装提示: {joined}"
+        click.echo(f"{name}: {item['status']}{detail}")
 
 
 @main.command(name="unpack-diagnose")

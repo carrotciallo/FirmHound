@@ -5,7 +5,7 @@ every analyzer implements :class:`ExternalAnalyzer`, the orchestrator, the
 fusion layer and the reporting layer never need to know which tool produced a
 finding.
 
-Design rules (non-negotiable, see docs/external/README.md §3.3):
+Design rules (non-negotiable, see docs/archive/team-charter.md §3.3):
 
 1. ``probe()`` must never raise. A raising probe takes down the whole pipeline.
 2. ``execute()`` catches every exception. A missing tool degrades to
@@ -27,7 +27,7 @@ from fsa.schemas.loader import validate
 SCHEMA_NAME = "external_finding"
 
 # Tools that require a known-vulnerability signature and therefore must never
-# participate in a blind benchmark run. See docs/external/F-FirmRec.md §4.
+# participate in a blind benchmark run. See docs/external/firmrec.md §4.
 RECURRENCE_ONLY_TOOLS = frozenset({"firmrec"})
 
 

@@ -113,7 +113,7 @@ def _process_findings(
     """Dedupe + cross-validate a batch of external findings.
 
     Returns ``(processed, external_only_count, blind_isolated_count)``. Pure
-    helper so the recurrence split (F-FirmRec.md §4.3) can reuse the same logic.
+    helper so the recurrence split (firmrec.md §4.3) can reuse the same logic.
     """
     seen: set[tuple[str, str, str]] = set()
     fused: list[dict[str, Any]] = []
@@ -315,7 +315,7 @@ def fuse(run_dir: str | Path, config_path: str | None = None) -> dict[str, Any]:
         findings (SaTC / KLEE / BOND), used by the benchmark as external evidence.
       * ``<run_dir>/artifacts/external_findings/recurrence_findings.json`` --
         FirmRec-only recurring detections, kept **separate** so they never leak
-        into ``unified_candidates`` / the blind benchmark (F-FirmRec.md §4.3).
+        into ``unified_candidates`` / the blind benchmark (firmrec.md §4.3).
     Returns a summary dict (wrapped into a success ToolResult by the registry).
     """
     run_dir = Path(run_dir)

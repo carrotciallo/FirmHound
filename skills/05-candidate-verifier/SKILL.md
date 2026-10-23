@@ -8,11 +8,11 @@ tags: [verifier, m7, evidence-model]
 
 ## 目标
 
-对 M6 评分排序产生的 Top-K 候选进行**独立、主动的证伪审查**，输出符合 `verdict.schema.json` 的 `verdicts.json`。本 Skill 是证据链可信度与答辩叙事创新点 ① 的核心载体。
+对 M6 评分排序产生的 Top-K 候选进行**独立、主动的证伪审查**，输出符合 `verdict.schema.json` 的 `verdicts.json`。本 Skill 是证据链可信度与“反证优先”设计要点的核心载体。
 
 ## 核心原则
 
-**反证优先（falsification-first）**：Verifier 的职责不是证明候选是漏洞，而是寻找能推翻候选的证据。只有经过系统性质询仍无法证伪的候选，才能进入高置信度或确认类别。
+**反证优先（falsification-first）**：Verifier 负责寻找能推翻候选的证据。经过系统性质询仍无法证伪的候选，才进入高置信度或确认类别。
 
 ## 五分类结论模型
 

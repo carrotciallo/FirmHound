@@ -1,6 +1,6 @@
 """M2 - path-constraint extraction and priority (mini-BOND X2).
 
-Implements BOND's three constraint classes and six semantic types (H-BOND.md §4.2).
+Implements BOND's three constraint classes and six semantic types (bond.md §4.2).
 A constraint is ``{"param", "semantic", "expr", "klass"}`` and maps 1:1 onto the
 ``external_finding.constraints[]`` schema field, consumed by directed fuzzing.
 
@@ -35,7 +35,7 @@ _NULL_RE = re.compile(r"(\w+)\s*==\s*null|(\w+)\s*!=\s*null", re.I)
 def parse_constraint_expr(expr: str, param: str = "") -> dict[str, str]:
     """Map a raw constraint expression to ``{semantic, klass, expr}``.
 
-    Inference rules (mirror H-BOND.md §4.2 examples):
+    Inference rules (mirror bond.md §4.2 examples):
       * ``deref(v2)=="General"`` / ``load(v1)=="1"`` -> ``string_eq`` / ``mandatory``
       * ``atoi(v3)∈(0,1500]`` / ``v3∈(0,1500]`` -> ``numeric_range`` / ``mandatory``
       * ``v0==null`` / ``v1!=null``            -> ``null_check`` / ``mandatory``

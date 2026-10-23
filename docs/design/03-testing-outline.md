@@ -1,6 +1,6 @@
-# FirmHound 测试文档大纲
+# FirmHound 测试文档纲要
 
-> 定位：回答评委“你们怎么证明产品能运行、结果可信、失败可控、安全合规”。测试文档一定要区分自动化测试、真实固件测试、外部工具降级测试和安全测试。
+> 用途：指导撰写测试文档，说明“如何证明系统能运行、结果可信、失败可控、安全合规”。必须区分自动化测试、真实固件测试、外部工具降级测试和安全测试。
 
 ## 0. 文档说明
 
@@ -29,7 +29,7 @@
 
 建议填写：
 
-- OS：Linux（Ubuntu 22.04+ / Debian 系）
+- OS：Linux（已在 Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE 验证；Alpine 容器用于静态分析）
 - Python：3.12.10，本项目要求 3.11+
 - CLI：`fsa 0.1.0`
 - 依赖：requirements.txt
@@ -88,8 +88,8 @@
 
 命令：
 
-```powershell
-python scripts/dev.py test
+```bash
+make test
 ```
 
 覆盖：
@@ -110,7 +110,7 @@ python scripts/dev.py test
 
 命令：
 
-```powershell
+```bash
 python -m pytest --collect-only -q
 ```
 
@@ -120,7 +120,7 @@ python -m pytest --collect-only -q
 
 命令：
 
-```powershell
+```bash
 python -m ruff check .
 ```
 
@@ -130,8 +130,8 @@ python -m ruff check .
 
 命令：
 
-```powershell
-python -m fsa.cli doctor --json-output
+```bash
+fsa doctor --json-output
 ```
 
 当前结果：
@@ -148,8 +148,8 @@ python -m fsa.cli doctor --json-output
 CI 命令：
 
 ```bash
-python scripts/dev.py test
-python scripts/dev.py ext-smoke
+make test
+make ext-smoke
 python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/ci-full
 python -m ruff check fsa tools scripts tests
 ```
@@ -337,7 +337,7 @@ python -m ruff check fsa tools scripts tests
 
 ## 11. 测试结论
 
-建议结论口径：
+建议的结论写法：
 
 - CLI 主链路可运行。
 - 单元测试、lint、doctor 通过。

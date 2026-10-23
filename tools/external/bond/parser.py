@@ -1,6 +1,6 @@
 """Parse BOND artifacts into normalized ``external_finding`` documents (F3).
 
-BOND (H-BOND.md §7.2) writes, per validated candidate:
+BOND (bond.md §7.2) writes, per validated candidate:
   * ``Bond_result/action_find/``   -> entry-point recognition result
   * ``Bond_result/custom_analysis/`` -> path-constraint analysis
   * ``fuzz_log/fuzz_sent_log.txt``   -> the request sequence actually sent
@@ -14,7 +14,7 @@ the BOND-specific ``validation`` field:
   * timeout marker  -> ``validation.triggered=null, probe="timeout"``
   * no evidence     -> ``validation.triggered=false, probe="none"`` (degrade, NOT reject)
 
-Compliance gate (H-BOND.md §5.1, §7.2): the PoC request is passed through
+Compliance gate (bond.md §5.1, §7.2): the PoC request is passed through
 :func:`tools.external.bond.sanitize.sanitize_poc`. When ``poc_sanitized`` is ``False``
 the finding is **dropped entirely** -- never persisted, never rendered. This is asserted
 by the unit tests.

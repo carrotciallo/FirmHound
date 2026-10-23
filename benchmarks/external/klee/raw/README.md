@@ -13,4 +13,4 @@ raw/<run_id>/klee-out-N/
   test*.ktest    # 到达 sink 的具体输入（witness，给 BOND）
 ```
 
-注意：`model.err` / `exec.err` 不是漏洞证据；parser 已显式将其路由到 `limitation`。
+注意：`model.err` / `exec.err` 归入 `limitation`，不计为漏洞证据。

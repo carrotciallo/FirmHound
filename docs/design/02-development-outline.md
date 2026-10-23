@@ -1,11 +1,11 @@
-# FirmHound 开发文档大纲
+# FirmHound 开发文档纲要
 
-> 定位：回答评委和后续维护者“系统是怎么实现的、如何扩展、如何保证工程质量”。重点写真实代码结构、接口契约和开发规范。
+> 用途：指导撰写开发/实现文档，回答“系统是怎么实现的、如何扩展、如何保证工程质量”。重点写真实代码结构、接口契约和开发规范，面向接手维护的工程师。
 
 ## 0. 文档说明
 
 - 文档目的：说明 FirmHound CLI 的工程实现、模块职责、开发约束、扩展方式与质量保障。
-- 适用读者：评委、开发同学、后续维护者、部署人员。
+- 适用读者：开发者、代码评审人、后续维护者、部署与运维人员。
 - 代码仓库：GitHub 仓库地址、commit、分支。
 - 当前版本：`fsa 0.1.0`
 
@@ -17,9 +17,9 @@
 
 ### 1.1 工程目标
 
-- 在比赛现场或实验室中快速分析授权固件。
+- 在授权评估项目或实验环境中快速分析固件。
 - 保持 CLI 可运行、可测试、可恢复、可审计。
-- 仅支持 Linux 原生环境（Windows/WSL 适配层已移除）。
+- 仅支持 Linux 原生环境，不区分发行版（Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE、Alpine 容器）。
 - 对外部重型工具缺失保持降级能力。
 
 ### 1.2 开发原则
@@ -280,7 +280,7 @@ tmp/                 临时解包与中间目录
 - 35 个 unit test 文件。
 - 3 个 integration test 文件。
 - pytest 收集 332 个测试项。
-- 当前稳定套件通过：320 passed，1 skipped。
+- 当前稳定套件通过：336 passed，1 skipped。
 - Schema examples 全量校验。
 
 ### 10.2 CI
@@ -288,8 +288,8 @@ tmp/                 临时解包与中间目录
 CI 覆盖：
 
 - Python 3.11 / 3.12 / 3.13。
-- `python scripts/dev.py test`
-- `python scripts/dev.py ext-smoke`
+- `make test`
+- `make ext-smoke`
 - `python scripts/run_pipeline.py --benchmark-fixtures --depth full`
 - Ruff lint。
 
@@ -312,7 +312,7 @@ CI 覆盖：
 - 真实 Ghidra/KLEE/BOND/FirmRec 依赖外部环境。
 - BE3LPro 加密固件需要解密材料。
 - CLI 是主产品形态，非在线 Web 系统。
-- 通用网络安全智能体口径需要通过文档强调“固件漏洞挖掘垂直 Agent”。
+- 对外定位统一写成“固件漏洞挖掘垂直 Agent”，不要泛化成通用安全智能体。
 
 ## 13. 附录
 

@@ -1,4 +1,4 @@
-"""X1 compliance gate: every red line must be covered (H-BOND.md §8.1, hard requirement).
+"""X1 compliance gate: every red line must be covered (bond.md §8.1, hard requirement).
 
 Each case asserts the returned ``(text, poc_sanitized)`` tuple. Dangerous payloads are
 rejected (``ok=False``) and the original primitive must NEVER appear in the output.

@@ -1,25 +1,30 @@
 # AGENTS.md — 工程约定（给所有 AI 代理 / 协作者）
 
-FirmHound（固件猎犬）：IoT 固件漏洞挖掘自动化流水线。本文件是**约束**，不是介绍；
+FirmHound（固件猎犬）：IoT 固件漏洞挖掘自动化流水线。本文件只写约束，不写介绍；
 背景与用法见 `README.md`，架构细节见 `docs/`。`CLAUDE.md` 与本文件必须同步修改。
 
 ## 0. 环境前提
 
-- **只支持 Linux 原生环境**（Ubuntu 22.04+ / Debian 系 / 容器）。Windows、WSL 适配层已移除，
-  不要再引入路径翻译、`.bat` 壳、`wsl -d ...` 之类的代码或文档。
-- Python 3.11+；依赖 `requirements.txt`；包以 editable 方式安装（`pip install -e .`）。
+- **只支持 Linux 原生环境，且不绑定发行版**（Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE、
+  Alpine 容器均需可用）。Windows、WSL 适配层已移除，不要再引入路径翻译、`.bat` 壳、
+  `wsl -d ...` 之类的代码或文档。
+- 文档里写安装步骤时不要只给 `apt`：按发行版并列给出，或指向 `README.md` 的依赖矩阵。
+- Python 3.11+；一律用项目内的 `.venv`，不要往系统 Python 装包。入口是 `make`：
+  `make dev` 建环境并 editable 安装，其余目标都走 `.venv/bin/python`。
 - 解包与动态验证依赖系统工具：`binwalk`、`unsquashfs`、`sasquatch`、`qemu-*`。
   缺失时工具必须降级，不得让主链路崩。
 
 ## 1. 常用命令
 
 ```bash
-pip install -r requirements.txt && pip install -e .
-fsa doctor                      # 环境自检（路径 / Schema / runtime / 工具）
-python scripts/dev.py test      # 单元测试（CI 主门）
-python scripts/dev.py test-all  # 单元 + 宿主集成（缺工具自动 skip）
-python scripts/dev.py lint      # ruff
-python scripts/dev.py smoke     # 走正式 CLI 的最小冒烟
+make dev        # 建 .venv + 装依赖 + editable 安装
+make doctor     # 环境自检（发行版 / 路径 / Schema / 工具）
+make test       # 单元测试（CI 主门）
+make test-all   # 单元 + 宿主集成（缺工具自动 skip）
+make lint       # ruff
+make smoke      # 走正式 CLI 的最小冒烟
+
+# 等价的手动写法：.venv/bin/python scripts/dev.py <test|lint|smoke>
 
 fsa analyze <firmware|rootfs> --input-type rootfs \
   --authorization-holder "设备所有者" --depth standard --run-id hunt1
@@ -71,9 +76,16 @@ fsa status <run-id> ; fsa resume <run-id>
 ## 5. 提交前检查
 
 ```bash
-python scripts/dev.py lint
-python scripts/dev.py test
-fsa doctor
+make lint
+make test
+make doctor
 ```
 
 三项都干净再提交。提交信息用 `feat: / fix: / docs: / refactor: / test:` 前缀。
+
+**提交时禁止 agent 署名**，这是硬性约定：
+
+- commit message 里不写 `Co-Authored-By: Claude / Codex / Copilot` 之类的共同作者行；
+- 不写 `Generated with ...`、`Made by ...`、`🤖`、工具名、模型名等尾注；
+- `git commit` 不加 `--author`，作者信息用本机配置的开发者身份；
+- 需要说明改动来源时写内容本身（改了什么、为什么改），不写"由谁生成"。

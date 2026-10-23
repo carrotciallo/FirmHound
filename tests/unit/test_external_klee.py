@@ -2,9 +2,9 @@
 
 These run the real ``klee-out-N`` fixtures under ``tools/external/klee/fixtures/raw``
 through :func:`parse_klee_output` with a hand-built ``harness_map``. They never
-invoke KLEE (CI constraint, G-KLEE.md §7.2).
+invoke KLEE (CI constraint, klee.md §7.2).
 
-Covered branches (G-KLEE.md §7.2):
+Covered branches (klee.md §7.2):
   * reachable (path feasible, witness emitted)
   * ptr.err (strong overflow evidence)
   * model.err / exec.err -> limitation, NOT a vuln (anti-false-positive)

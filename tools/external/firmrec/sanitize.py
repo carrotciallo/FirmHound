@@ -1,6 +1,6 @@
 """PoC sanitizer for FirmRec — thin re-export of the canonical BOND sanitizer.
 
-F-FirmRec.md §7.4 mandates that every ``poc_info`` PoC must pass sanitization
+firmrec.md §7.4 mandates that every ``poc_info`` PoC must pass sanitization
 before the finding may be persisted. The canonical, group-wide sanitizer lives
 in H's BOND package (``tools.external.bond.sanitize.sanitize_poc``) and is the
 single source of truth for the safety red line (no reverse shells, no download-

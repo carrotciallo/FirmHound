@@ -1,6 +1,6 @@
 # FirmHound 产品数据资料包
 
-> 用途：给负责不同文档的同学统一取数。本文档只记录当前项目可证实数据、建议引用口径和待补数据，不要求写成完整文章。
+> 用途：给负责不同文档的同学统一取数。本文档只记录当前项目可证实的数据、建议的表述和待补数据，不要求写成完整文章。
 
 ## 1. 产品基础信息
 
@@ -14,7 +14,7 @@
 | 主要对象 | IoT 固件、rootfs、路由器/网关等智能联网设备 |
 | 核心流程 | 解包 -> 攻击面 -> 二进制分析 -> 静态审计 -> 十维评分 -> 反证验证 -> 动态验证 -> 证据报告 |
 | 默认运行时 | offline 确定性离线运行时 |
-| 可选运行时 | openai-compatible 国内备案模型/主办方网关适配口径 |
+| 可选运行时 | openai-compatible 端点（可接企业 AI 网关） |
 | 最新提交 | `7148e4f feat: harden firmware unpacking for real images` |
 
 ## 2. CLI 命令数据
@@ -57,12 +57,12 @@
 | CVE benchmark 目录 | 9 |
 | unit test 文件 | 35 |
 | integration test 文件 | 3 |
-| docs Markdown 文件 | 14 |
+| docs Markdown 文件 | 25 |
 | 外部分析器目录 | 4 |
 
 ### 3.2 外部分析器
 
-| 工具 | 定位 | 当前口径 |
+| 工具 | 定位 | 当前表述 |
 |---|---|---|
 | SaTC | 跨函数 source-sink/污点分析增强 | adapter/parser/fixture/降级测试已完成，真实运行依赖 Docker/Ghidra/angr |
 | FirmRec | 已知漏洞复发检测 | Blind Run 隔离，不进入零先验统一候选 |
@@ -179,7 +179,7 @@
 | 项目 | 数据 |
 |---|---:|
 | pytest 收集项 | 332 |
-| 稳定测试结果 | 320 passed, 1 skipped |
+| 稳定测试结果 | 336 passed, 1 skipped |
 | Ruff | passed |
 | CI Python 版本 | 3.11、3.12、3.13 |
 
@@ -188,15 +188,15 @@
 CI 包含：
 
 - 安装依赖。
-- `python scripts/dev.py test`
-- `python scripts/dev.py ext-smoke`
+- `make test`
+- `make ext-smoke`
 - `python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/ci-full`
 - 检查 `ranking.json`、`verdicts.json`、`report.md`、`artifacts/unified_candidates.json`
 - `python -m ruff check fsa tools scripts tests`
 
 ## 8. 历史 CVE fixture 数据
 
-> 老师提到之前挖过的 CVE 漏洞可以作为数据加入。当前仓库已有 9 个 CVE benchmark fixture。写文档时建议表述为“历史 CVE 基准/复现数据/回归样本”，不要表述成这次盲测新挖出的 0-day。
+> 前期复现过的 CVE 可以作为数据纳入。当前仓库已有 9 个 CVE benchmark fixture。写文档时统一表述为“历史 CVE 基准 / 复现数据 / 回归样本”，不要表述成本轮盲测新发现的 0-day。
 
 | CVE | 设备/厂商 | 类型 | Source | Sink | 风险分 | 等级 | 结论 |
 |---|---|---|---|---|---:|---|---|
@@ -247,7 +247,7 @@ CI 包含：
 | 静态候选 | 645 |
 | top verdict | 多条为 `NEED_DYNAMIC` |
 | 重点位置 | `bin/httpd`、`/goform/formWifiConfigGet` |
-| 文档口径 | 静态候选，不等于已确认漏洞 |
+| 文档表述 | 静态候选，未确认漏洞 |
 
 ### 9.3 OpenWrt WE826
 
@@ -259,7 +259,7 @@ CI 包含：
 | 攻击面条目 | 357 |
 | 二进制数量 | 166 |
 | 高风险候选 | 未生成 |
-| 文档口径 | 标准 OpenWrt 样本，证明完整链路稳定性 |
+| 文档表述 | 标准 OpenWrt 样本，证明完整链路稳定 |
 
 ### 9.4 Tenda BE3LPro
 
@@ -270,7 +270,7 @@ CI 包含：
 | CLI 行为 | 保存加密载荷切片 |
 | 切片路径 | `tmp/real-be3lpro-20260902-r2/unpacked/encrypted_openssl_516.bin` |
 | 当前状态 | 需要厂商密码/密钥/升级工具解密逻辑 |
-| 文档口径 | 体现加密固件识别和诚实降级能力 |
+| 文档表述 | 加密固件识别与降级处理 |
 
 ## 10. 本轮真实固件测试暴露并修复的问题
 
@@ -340,7 +340,7 @@ CI 包含：
 可用数据：
 
 - pytest 收集 332。
-- 稳定测试 320 passed，1 skipped。
+- 稳定测试 336 passed，1 skipped。
 - Ruff passed。
 - doctor status ok。
 - 真实固件三样本结果。
@@ -382,14 +382,14 @@ CI 包含：
 | OpenWrt 每阶段耗时 | 测试文档/技术报告/PPT | 本地重新跑并记录 |
 | 峰值磁盘占用 | 部署/测试文档 | 本地统计 |
 | 峰值内存 | 部署/测试文档 | 本地或 CI 统计 |
-| AC15 top 候选动态验证结果 | 技术报告/答辩 | 隔离仿真环境 |
+| AC15 top 候选动态验证结果 | 技术报告/评审 | 隔离仿真环境 |
 | SaTC 真实运行结果 | 外部工具协同证明 | 具备 Ghidra/Docker 环境 |
 | KLEE 真实运行结果 | 反证能力证明 | 具备 KLEE/LLVM 环境 |
 | mini-BOND 真实仿真结果 | 动态验证能力证明 | 授权私有目标 |
-| 主办方 AI 安全网关参数 | 比赛合规 | 团队/老师 |
-| 在线可测试访问地址 | 提交材料 | 团队决定是否做 Web/API 包装 |
+| 平台 AI 网关参数 | 部署合规 | 平台/运维 |
+| 在线可试访问地址 | 交付材料 | 由团队决定是否做 Web/API 包装 |
 
-## 14. 推荐引用口径
+## 14. 推荐引用说法
 
 可以写：
 

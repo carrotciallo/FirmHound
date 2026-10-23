@@ -18,7 +18,7 @@
 
 ## 运行配置（两种 vuln_info 模式 × L1/L2/L3）
 
-- vuln_info 来源：`vuln_info_source: our`（我们的 9-CVE 知识库） / `official`（官方样例）
+- vuln_info 来源：`vuln_info_source: our`（自建的 9-CVE 知识库） / `official`（官方样例）
 - 固件：L1 合成（x86，FirmRec 主打 MIPS/ARM，支持待验）/ L2 DIR-859 / L3 两个真实固件
 - 边界二进制：由 `inout/experiment.json` 任务表指定
 
@@ -27,7 +27,7 @@
 - L1：合成固件（`scripts/e2e/build_firmware.sh`，含 `getenv→sprintf→system`）
 - L2：`firmware_samples/DIR859_FW102b03.bin`（已解包 `tmp/unpacked/_DIR859_FW102b03.bin.extracted/squashfs-root`）
 - L3：两个真实固件（Tenda AC15 / Netgear R7000 类），**待下载后补 SHA256**
-- `vuln_info`：我们的 9-CVE 知识库已整理为 `tools/external/firmrec/vuln_info_dataset.json`
+- `vuln_info`：自建的 9-CVE 知识库已整理为 `tools/external/firmrec/vuln_info_dataset.json`
 
 ## 耗时 / 内存 / 产物基线（F9）
 
@@ -54,5 +54,5 @@
 - 需要已知漏洞签名：与零 CVE 先验冲突，故**绝不参与 Blind Benchmark**。
 - 合成固件是 x86，FirmRec 主打 MIPS/ARM，L1 支持情况待验。
 - PostgreSQL 须在 `make start` 后就绪，否则 pipeline 阶段记 limitation（非伪成功）。
-- 官方 `vuln_info` 真实 schema 以官方样例为准；本仓库 `vuln_info_dataset.json` 是我们
+- 官方 `vuln_info` 真实 schema 以官方样例为准；本仓库 `vuln_info_dataset.json` 是本仓库
   9-CVE 的最佳努力映射，推定字段已标 `presumed=true`（见 `vuln_info_mapping.md`）。

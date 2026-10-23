@@ -8,9 +8,9 @@ tags: [orchestrator, pipeline, m0, state-machine, planner]
 
 ## 目标
 
-本 Skill 定义整条「固件漏洞挖掘自动化流水线」的**总控逻辑**：把 01–07 各领域 Skill 串成可恢复、可审计、可中断的阶段机。WorkBuddy/模型在收到比赛任务卡（task_card）时，必须先加载本 Skill 理解阶段流转、裁决口径与产物契约，再按阶段派发子 Skill 与确定性工具。
+本 Skill 定义整条「固件漏洞挖掘自动化流水线」的**总控逻辑**：把 01–07 各领域 Skill 串成可恢复、可审计、可中断的阶段机。WorkBuddy/模型在收到任务卡（task_card）时，必须先加载本 Skill 理解阶段流转、裁决规则与产物契约，再按阶段派发子 Skill 与确定性工具。
 
-核心原则：**阶段机器驱动，而非自由发挥**。任何一次分析都必须走 `INIT → … → REPORT → DONE`，中途可断点续跑（resume）、可人工门控（HumanGate）、可失败降级（fallback），但结论必须落在统一证据模型上。
+核心原则：**阶段机驱动**。任何一次分析都必须走 `INIT → … → REPORT → DONE`，中途可断点续跑（resume）、可人工门控（HumanGate）、可失败降级（fallback），但结论必须落在统一证据模型上。
 
 ## 阶段机（Stage Machine）
 

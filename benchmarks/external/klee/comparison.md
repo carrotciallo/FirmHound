@@ -1,6 +1,6 @@
 # KLEE 剪枝实验 · comparison.md
 
-> 实验设计（G-KLEE.md §8）：对 `finding_fusion` 产出的 unified candidates 的 Top-10，逐个生成
+> 实验设计（klee.md §8）：对 `finding_fusion` 产出的 unified candidates 的 Top-10，逐个生成
 > harness → `klee --max-time=300s`，统计**剪枝率**与**人工抽检**。
 
 ## 指标

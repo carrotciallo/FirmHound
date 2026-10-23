@@ -1,23 +1,20 @@
-# G 同学 · KLEE 全量复现与集成计划
+# KLEE 接入与复现计划
 
-> **你的任务**：把 KLEE（v3.2）从"能跑 hello world"做到"能对真实固件候选做路径可行性剪枝"，
-> 并自主实现 **harness 生成器**——这是四人里**自研工程量最大**的一块。
+> 目标：把 KLEE（v3.2）从"能跑 hello world"做到"能对真实固件候选做路径可行性剪枝"，并实现
+> harness 生成器（本工具自研工作量最大的一块）。验收标准见 §2 全量档 9 条。
 >
-> **基调：不是跑通 demo，是全量完成。** 你的验收标准见 §2 全量档 9 条。
->
-> **你为什么关键**：BOND 的定向 fuzz 很贵（十几分钟到几十分钟一次）。
-> 你先用符号执行证明"这条路根本走不通"，把这类候选剪掉，**只把剩下的送进 BOND**。
-> 你省下的每一分钟，都是 H 的预算。
+> 位置：BOND 的定向 fuzz 每次十几分钟到几十分钟，开销高。KLEE 先用符号执行排除走不通的路径，
+> 只把可达候选交给 BOND。
 
 ---
 
 ## 1. 三句话讲清 KLEE
 
 - **它解决什么**：动态符号执行。把输入符号化，沿路径收集约束，交给 SMT 求解器（STP/Z3）判定"这条路径能不能走通"，能走通就给出**具体输入**。
-- **它补我们什么**：我们现在答不出"这条 source→sink 路径在约束上真的能执行到吗"。误报全靠 5 条经验规则和人工 10 问扛。KLEE 给的是**数学判定**。
+- **补上的能力**：当前答不出"这条 source→sink 路径在约束上真的能执行到吗"。误报全靠 5 条经验规则和人工 10 问扛。KLEE 给的是**数学判定**。
 - **它在链条哪**：`SYMEX_PRUNE` 阶段，吃汇聚后的候选，产出 `symex.reachable` + `witness_input`。
 
-### 1.1 一个关键优势（答辩要讲）
+### 1.1 一个关键优势（技术评审要点）
 
 **KLEE 跑的是 LLVM bitcode 语义，天然跨架构。** 固件是 MIPS/ARM，但一旦拿到 bitcode，
 KLEE 不需要 qemu、不需要真机、不需要关心字节序。这比 BOND 的黑盒 fuzz 干净得多，
@@ -27,7 +24,7 @@ KLEE 不需要 qemu、不需要真机、不需要关心字节序。这比 BOND �
 
 ## 2. 交付标准（三档）
 
-### 全量档（Full）—— 你的目标
+### 全量档（Full）
 
 | # | 项 | 具体判定 |
 |---|---|---|
@@ -41,7 +38,7 @@ KLEE 不需要 qemu、不需要真机、不需要关心字节序。这比 BOND �
 | **F8** 文档全量 | SKILL.md 含 7 节 + 踩坑表 + **harness 生成规则说明** | 文档齐 |
 | **F9** 性能基线 | 每候选的符号执行耗时、内存峰值、路径数、状态数 | 基线表 |
 
-### 你的独有交付（别人没有）
+### 本工具独有的交付
 
 | # | 项 | 说明 |
 |---|---|---|
@@ -62,7 +59,7 @@ KLEE 不需要 qemu、不需要真机、不需要关心字节序。这比 BOND �
 | 全称 | KLEE Symbolic Execution Engine |
 | 版本 | **KLEE 3.2（2025-12-23 发布）**，官方提供 Docker |
 | LLVM | **推荐 LLVM 16**（3.2 已部分支持 17–19；不再支持 <11） |
-| 求解器 | STP（历史最稳）或 **Z3（≥4.4，推荐，我们选用）**，也支持 metaSMT |
+| 求解器 | STP（历史最稳）或 **Z3（≥4.4，推荐，本项目选用）**，也支持 metaSMT |
 | 输入 | **LLVM bitcode `.bc`** ← 这是最大约束 |
 | 输出 | `klee-out-N/`：`*.err`（内存错误）、`test*.ktest`（具体输入）、`info`、`run.stats`、`warnings.txt` |
 | 辅助 | `ktest-tool` 读 `.ktest`；`klee-stats` 看统计；`wllvm` 编全程序 bitcode（推荐装） |
@@ -97,11 +94,11 @@ ktest-tool --write-ints klee-out-0/test000001.ktest
 | `div.err` | 除零 |
 | `overflow.err` | 整数溢出 |
 | `assert.err` | `klee_assert` 失败 |
-| `model.err` | 内存模型限制（不是漏洞，是 limitation） |
+| `model.err` | 内存模型限制，归入 limitation |
 | `exec.err` | 外部调用/不支持的指令（limitation） |
 
-> ⚠️ **`model.err` 和 `exec.err` 不是漏洞证据**，必须归到 `limitation`，
-> 否则你的误报会比没接 KLEE 时还多。
+> ⚠️ **`model.err` 和 `exec.err` 属于 limitation**，不计为漏洞证据，
+> 否则误报会高于不接 KLEE 的情况。
 
 ---
 
@@ -114,17 +111,17 @@ ktest-tool --write-ints klee-out-0/test000001.ktest
 | 路径 | 适用 | 做法 | 时间盒 |
 |---|---|---|---|
 | **S1 · 源码 wllvm** | **L1 合成固件**（自带 `httpd.c` / `upnpd.c` 源码！） | `wllvm -O0 -g` 编译 → `extract-bc` 拿到 `.bc` | 必成，Day0 就做 |
-| **S2 · harness 桩（主推）** | **L2/L3 真实固件**（无源码） | 从 candidate 的 sink 签名生成 C 桩 + 符号输入 → `clang -emit-llvm` | **你的主战场** |
+| **S2 · harness 桩（主推）** | **L2/L3 真实固件**（无源码） | 从 candidate 的 sink 签名生成 C 桩 + 符号输入 → `clang -emit-llvm` | **主要实现路径** |
 | **S3 · 二进制提升** | 理论上通用 | mcsema / retDec / llvm-mctoll 把 ELF 抬成 LLVM IR | **4 小时硬上限，失败即放弃并记录** |
 
 > ✅ **好消息**：`scripts/e2e/build_firmware.sh` 生成的合成固件**自带 C 源码**
 > （`httpd.c` 的 `getenv("QUERY_STRING")` → `sprintf(buf,"%s; reboot",cmd)` → `system(buf)`）。
-> **S1 路径对 L1 是必成的**，你 Day0 晚上就能拿到第一批真实符号执行结果。
+> **S1 路径对 L1 是必成项**，环境就绪当天即可拿到第一批真实符号执行结果。
 
 > ⚠️ **S3 不要恋战**。二进制提升对 MIPS/ARM 支持很差，成功率和产物质量都不可靠。
-> 4 小时拿不到可用 bitcode 就**立刻放弃**，把时间还给 S2。这是明智的止损，不是失败。
+> 4 小时拿不到可用 bitcode 就**立刻放弃**，把时间还给 S2。止损比硬扛划算。
 
-### 4.2 S2 harness 生成器设计（X1，你的核心工程）
+### 4.2 S2 harness 生成器设计（X1）
 
 **输入**（来自 candidate + 二进制信息）：
 
@@ -223,7 +220,7 @@ def prune(candidate, symex_result) -> dict:
 
 ## 5. 逐日排期（8/30 13:00 起）
 
-### 8/30（半天 + 晚上）—— 环境 + S1 打通
+### 阶段 0 · 环境与 S1 打通
 
 | 时间 | 任务 | 产出 |
 |---|---|---|
@@ -232,13 +229,13 @@ def prune(candidate, symex_result) -> dict:
 | 17:00–19:00 | **S1 打通**：用 `scripts/e2e/build_firmware.sh` 的 `httpd.c` / `upnpd.c`，wllvm 编出 `.bc`，跑 `klee` | **第一批真实符号执行结果** |
 | 19:00–21:00 | 跑通 `ktest-tool`；确认能拿到具体输入；确认 `system(buf)` 路径可达 | witness input 样例 |
 | 21:00–24:00 | 试 S3（二进制提升），**计时 4 小时上限**；同时开始设计 `harness_gen.py` | S3 结论 + harness 设计 |
-| 21:00 | 四人同步会 | — |
+| 21:00 | 契约同步会 | — |
 
 **今日硬产出**：`klee --version` 能跑；L1 合成固件的 `.bc` 跑出结果；`ktest-tool` 拿到具体输入。
 
 > ⚠️ S3 试到 24:00 还没戏就放弃，**明天不要再碰**。
 
-### 8/31 —— S2 harness + 全量复现
+### 阶段 1 · S2 harness 与全量复现
 
 | 时间 | 任务 |
 |---|---|
@@ -250,7 +247,7 @@ def prune(candidate, symex_result) -> dict:
 
 **今日硬产出**：`harness_gen.py` v1 可用；3 固件 × Top-10 候选的符号执行结果。
 
-### 9/1 —— Parser + 单测日
+### 阶段 2 · Parser 与单测
 
 | 时间 | 任务 |
 |---|---|
@@ -260,18 +257,18 @@ def prune(candidate, symex_result) -> dict:
 | 18:00–20:00 | 单测：harness 生成器 + parser 六类分支 |
 | 20:00–21:00 | `pytest --cov` ≥80% |
 
-### 9/2 —— 接入 + 联调日（⚠ 18:00 熔断）
+### 阶段 3 · 接入与联调（18:00 收口）
 
 | 时间 | 任务 |
 |---|---|
 | 09:00–11:00 | registry 声明；`run_external.py --tool klee` 跑通 |
-| 11:00–13:00 | 与 E 对接 `finding_fusion`（你要的候选输入格式、你回写的 `symex` 字段） |
+| 11:00–13:00 | 与汇聚层对接 `finding_fusion`（候选输入格式、回写的 `symex` 字段） |
 | 13:00–15:00 | `SYMEX_PRUNE` 阶段接入；`--depth full` 全链路跑通 |
 | 15:00–17:00 | 8 种开关组合降级测试；**验证超时/路径爆炸不改分** |
-| 17:00–18:00 | 把你的 `source/sink/call_trace` 输出格式交给 H（BOND 要用） |
-| **18:00** | **熔断评审**：按 §2 三档给自己定档 |
+| 17:00–18:00 | 输出 `source/sink/call_trace` 格式给 BOND（下游输入） |
+| **18:00** | **阶段收口评审**：按 §2 三档核对实际完成度 |
 
-### 9/3 —— 量化 + 文档日
+### 阶段 4 · 量化与文档
 
 | 时间 | 任务 |
 |---|---|
@@ -279,19 +276,19 @@ def prune(candidate, symex_result) -> dict:
 | 13:00–15:00 | **人工抽检 5 条被剪候选**，确认无误杀（这是 F6 的硬要求） |
 | 15:00–18:00 | 写 `benchmarks/external/klee/comparison.md` |
 | 18:00–20:00 | 写 `skills/08-external-analyzers/klee/SKILL.md`（7 节 + 踩坑表 + harness 规则） |
-| 20:00–21:00 | 更新 `docs/external_analyzers.md` 的 KLEE 部分 |
+| 20:00–21:00 | 更新 `docs/external/README.md` 的 KLEE 部分 |
 
-### 9/4 —— 冻结 + 演示日
+### 阶段 5 · 冻结与演示
 
 - 代码冻结
 - 演示素材：**"KLEE 证明了这 4 个候选根本走不通，给 BOND 省下 40 分钟"**
-- 答辩 Q&A 预案（见 §9）
+- 设计质询 Q&A 预案（见 §9）
 
 ---
 
 ## 6. 代码骨架
 
-### 6.1 文件清单（你负责）
+### 6.1 实现范围
 
 ```
 tools/external/klee/__init__.py
@@ -307,7 +304,7 @@ tests/unit/test_external_klee.py
 tests/unit/test_harness_gen.py         # ★ harness 生成器单测
 skills/08-external-analyzers/klee/SKILL.md
 benchmarks/external/klee/{README.md,comparison.md,raw/}
-docs/external/G-KLEE.md
+docs/external/klee.md
 ```
 
 ### 6.2 parser.py 映射表
@@ -319,14 +316,14 @@ docs/external/G-KLEE.md
 | `overflow.err` | 整数溢出 | 证据（记 `notes`） |
 | `div.err` | 除零 | 证据（低优先级，记 `notes`） |
 | `assert.err` | `klee_assert` 失败 | 取决于断言含义，记 `notes` |
-| **`model.err`** | 内存模型限制 | ⚠️ **归 `limitation`，不是漏洞** |
-| **`exec.err`** | 外部调用/不支持指令 | ⚠️ **归 `limitation`，不是漏洞** |
+| **`model.err`** | 内存模型限制 | ⚠️ **归 `limitation`** |
+| **`exec.err`** | 外部调用/不支持指令 | ⚠️ **归 `limitation`** |
 | `info` | 版本、参数、路径数 | `tool_version`、`notes` |
 | `run.stats` | 指令数、状态数、内存峰值 | `duration_s`、`notes`（性能基线） |
 | `warnings.txt` | 警告 | `limitation` |
 | `klee-out-N/assembly.ll` | 具体出错位置 | `sink.addr` 辅助定位（需与 ELF 地址对齐，难，可留 TODO） |
 
-### 6.3 `external_finding` 的 `symex` 字段（你专有）
+### 6.3 `external_finding` 的 `symex` 字段（KLEE 专有）
 
 ```json
 "symex": {
@@ -340,11 +337,10 @@ docs/external/G-KLEE.md
 
 **`harness_version` 必须写**——这是误杀防护可追溯的前提。
 
-### 6.4 与 H 的接口（你在 9/2 17:00 前要给 H）
+### 6.4 与 BOND 的接口
 
-H 的 BOND 需要 `source / sink / call_trace` 三元组。你的输出**已经是这个格式**，
-H 会优先消费**你判定 `reachable=true` 且带 `witness_input` 的候选**。
-请把以下字段保证齐全：`source.type`、`source.name`、`sink.function`、`sink.addr`、`call_trace[]`、`constraints[]`（若有）。
+BOND 需要 `source / sink / call_trace` 三元组，KLEE 的输出已是这个格式。
+下游优先消费 `reachable=true` 且带 `witness_input` 的候选。字段必须齐全：`source.type`、`source.name`、`sink.function`、`sink.addr`、`call_trace[]`、`constraints[]`（若有）。
 
 ---
 
@@ -423,13 +419,13 @@ H 会优先消费**你判定 `reachable=true` 且带 `witness_input` 的候选**
 
 ---
 
-## 10. 答辩 Q&A 预案
+## 10. 设计质询 Q&A
 
-**Q：KLEE 要 LLVM bitcode，固件是二进制，你们怎么办？**
-A：三条路，我们主推 **harness**。① 有源码的组件（合成固件的 httpd/upnpd、开源组件 Boa/goahead）走 `wllvm`，最干净；② 真实固件无源码，就把可疑函数抠出来写 C 桩编成 bitcode——这是我们的自研 `harness_gen.py`；③ 二进制提升（mcsema/retDec）对 MIPS/ARM 支持差，我们给了 4 小时验证，行不通就止损。**而且 KLEE 跑的是 bitcode 语义，天然跨架构，不需要 qemu 和真机。**
+**Q：KLEE 需要 LLVM bitcode，固件只有二进制怎么办？**
+A：三条路，主推 **harness**。① 有源码的组件（合成固件的 httpd/upnpd、开源组件 Boa/goahead）走 `wllvm`，最干净；② 真实固件无源码，把可疑函数抠出来写 C 桩编成 bitcode，由自研 `harness_gen.py` 完成；③ 二进制提升（mcsema/retDec）对 MIPS/ARM 支持差，已安排 4 小时验证，不通则止损。KLEE 执行的是 bitcode 语义，天然跨架构，不需要 qemu 和真机。
 
 **Q：KLEE 判"不可达"，会不会把真漏洞误杀掉？**
-A：这是我最担心的，所以做了三重防护：① 结论只写 `counterevidence`，**不直接删候选**，是否判误报交给 Verifier 的 10 问 + 12 硬规则；② `reachable=false` 必须带 `harness_version`，报告里写明「基于 harness 建模假设」；③ **剪枝率 >70% 触发人工抽检 5 条**。宁可少剪，不可错杀。
+A：有三重防护：① 结论只写 `counterevidence`，**不直接删候选**，是否判误报交给 Verifier 的 10 问 + 12 硬规则；② `reachable=false` 必须带 `harness_version`，报告里写明「基于 harness 建模假设」；③ **剪枝率 >70% 触发人工抽检 5 条**。
 
 **Q：超时的候选怎么处理？**
 A：**不改分**。超时和路径爆炸都只记 `limitation`，既不升也不降。只有明确的 `infeasible` 才写反证。
@@ -447,4 +443,3 @@ A：**不改分**。超时和路径爆炸都只记 `limitation`，既不升也�
 
 ---
 
-*你是全组的省钱器。你每剪掉一个假候选，H 就多出十几分钟去打真目标。*

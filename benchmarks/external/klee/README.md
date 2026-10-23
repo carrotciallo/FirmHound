@@ -1,7 +1,7 @@
 # KLEE 外部分析器 · Benchmark 档案
 
 > 工具：KLEE 3.2（LLVM 16 + Z3）。阶段：`SYMEX_PRUNE`。
-> 负责同学：G。计划：见 `docs/external/G-KLEE.md`。技能卡：`skills/08-external-analyzers/klee/SKILL.md`。
+> 负责同学：G。计划：见 `docs/external/klee.md`。技能卡：`skills/08-external-analyzers/klee/SKILL.md`。
 
 ## 这个工具解决什么
 

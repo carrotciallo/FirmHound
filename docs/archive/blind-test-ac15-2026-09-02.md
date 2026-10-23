@@ -1,6 +1,8 @@
 # 盲测迭代记录 — Tenda AC15 & OpenWrt（2026-09-02）
 
-> 用 FirmHound CLI（`python -m fsa.cli analyze`）在**未知真实固件**上模拟比赛挖漏洞，
+> **已归档**：2026-09-02 的 AC15 盲测迭代记录，代表当时的检出效果，不能当作基线。
+
+> 用 FirmHound CLI（`python -m fsa.cli analyze`）在**未知真实固件**上做零先验盲测，
 > 顺带发现并修复 CLI 自身缺陷，一代一代迭代。本文记录 v1→v2→v3 的实测数据与改动。
 
 ## 0. 输入与运行环境
@@ -114,5 +116,5 @@ path_traversal"翻转为 **httpd command_injection（16 分）居首**；verdict
 ### 剩余 backlog（如实）
 - **handler 名↔函数绑定**：需 Ghidra（或运行时表逆向）→ 才能出 "formexeCommand→sub_→doSystemCmd"
   可演示全链；纯静态在本固件不可解。
-- OpenWrt 过滤变严后候选归零属"宁可漏不可错"取向，比赛口径可调（config 开关化）。
+- OpenWrt 过滤变严后候选归零属"宁可漏不可错"取向，该取向可调（config 开关化）。
 - 外部四工具轨真实 full 深度 → 需真机（8/31 清单未变）。

@@ -1,10 +1,10 @@
-# FirmHound Linux 虚拟机从零部署与演示指南
+# FirmHound Linux 部署与演示指南
 
-> 适用场景：你刚装好一台 Linux 虚拟机，希望把 FirmHound 从 GitHub 下载下来，配置环境，并跑通演示视频里的完整 CLI 流程。
+> 适用场景：在一台干净的 Linux 环境（虚拟机 / 物理机 / 云主机 / 容器均可）上，从零把 FirmHound 拉下来、配好环境、跑通完整 CLI 流程。
 
-本文默认使用 Ubuntu 22.04 / Ubuntu 24.04 / Debian 系 Linux。其他发行版也能用，但包管理命令需要替换。
+**发行版覆盖**：Debian/Ubuntu（含 Kali、Raspberry Pi OS）、Fedora/RHEL/CentOS Stream/Rocky/Alma、Arch/Manjaro、openSUSE Leap/Tumbleweed、Alpine（容器）。各发行版的包名差异见下文 §3 的对照表；工具链缺项只会让对应阶段降级，不会阻断静态分析。
 
-## 0. 演示目标
+## 0. 部署目标
 
 本指南跑通以下内容：
 
@@ -22,9 +22,9 @@
 
 你需要准备：
 
-- 一台刚装好的 Linux 虚拟机。
+- 一台 Linux 环境（虚拟机、物理机、云主机或容器，2 核 4G 起步即可）。
 - 可以联网。
-- 已安装 Git，或者允许通过 `apt` 安装。
+- 已安装 Git，或允许通过包管理器安装。
 - 三个授权固件样本：
   - `US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin`
   - `openwrt-23.05.0-ramips-mt7620-zbtlink_zbt-we826-16m-squashfs-sysupgrade.bin`
@@ -32,46 +32,73 @@
 - GitHub 仓库地址：
 
 ```text
-https://github.com/KimLee-12138/FirmHound-CLI.git
+https://github.com/cyx-weimijiheheda/FirmHound.git
 ```
 
 ## 2. 更新系统
 
-打开 Linux 终端，执行：
+按发行版选择对应命令：
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
-```
+# Debian / Ubuntu
+sudo apt update && sudo apt upgrade -y
 
-如果系统提示输入密码，输入你安装虚拟机时设置的用户密码即可。
+# Fedora / RHEL 系
+sudo dnf upgrade --refresh -y
+
+# Arch / Manjaro
+sudo pacman -Syu --noconfirm
+
+# openSUSE
+sudo zypper refresh && sudo zypper update -y
+
+# Alpine
+sudo apk update && sudo apk upgrade
+```
 
 ## 3. 安装基础依赖
 
+### 3.1 一条命令装齐
+
 ```bash
-sudo apt install -y \
-  git \
-  python3 \
-  python3-pip \
-  python3-venv \
-  python3-dev \
-  build-essential \
-  make \
-  gcc \
-  g++ \
-  file \
-  binutils \
-  curl \
-  wget \
-  unzip \
-  p7zip-full \
-  cpio \
-  squashfs-tools \
-  binwalk \
-  tree
+# Debian / Ubuntu
+sudo apt install -y git python3 python3-pip python3-venv python3-dev \
+  build-essential gcc g++ make file binutils curl wget unzip tree \
+  p7zip-full cpio squashfs-tools binwalk pipx
+
+# Fedora / RHEL 系
+sudo dnf install -y git python3 python3-devel gcc gcc-c++ make file binutils \
+  curl wget unzip tree p7zip p7zip-plugins cpio squashfs-tools binwalk pipx
+
+# Arch / Manjaro（binwalk 在 AUR）
+sudo pacman -S --needed --noconfirm git python base-devel file binutils curl wget \
+  unzip tree p7zip cpio squashfs-tools
+yay -S --needed --noconfirm binwalk
+
+# openSUSE Leap / Tumbleweed
+sudo zypper install -y git python3 python3-devel gcc gcc-c++ make file binutils \
+  curl wget unzip tree p7zip cpio squashfs python3-pip
+pipx install binwalk
+
+# Alpine（容器）
+sudo apk add git python3 py3-pip python3-dev gcc g++ make musl-dev file binutils \
+  curl wget unzip tree p7zip cpio squashfs-tools
+pipx install binwalk
 ```
 
-检查版本：
+### 3.2 包名对照（易错项）
+
+| 能力 | Debian/Ubuntu | Fedora/RHEL | Arch | openSUSE | Alpine |
+|---|---|---|---|---|---|
+| SquashFS 工具 | `squashfs-tools` | `squashfs-tools` | `squashfs-tools` | `squashfs` | `squashfs-tools` |
+| 7z | `p7zip-full` | `p7zip` + `p7zip-plugins` | `p7zip` | `p7zip` | `p7zip` |
+| ELF 工具 | `binutils` | `binutils` | `binutils` | `binutils` | `binutils` |
+| C 工具链 | `build-essential` | `gcc gcc-c++ make` | `base-devel` | `gcc gcc-c++ make` | `build-base` |
+| Python 头文件 | `python3-dev` | `python3-devel` | 随 `python` | `python3-devel` | `python3-dev` |
+| venv | `python3-venv` | 内置 | 内置 | 内置 | `py3-pip` |
+| QEMU 用户态 | `qemu-user-static` | `qemu-user-static` | AUR `qemu-user-static` | `qemu-linux-user` | `qemu-arm` `qemu-mipsel` … |
+
+### 3.3 检查版本
 
 ```bash
 python3 --version
@@ -80,7 +107,7 @@ binwalk --help | head
 unsquashfs -version
 ```
 
-建议 Python 版本为 3.11 或更高。如果你的系统是 Python 3.10，通常也能装，但正式比赛材料建议写 3.11+。
+建议 Python 版本为 3.11 或更高（项目 `pyproject.toml` 的 `requires-python` 为准）。3.10 通常也能跑通，但不作为支持矩阵内的版本。
 
 ## 4. 安装 sasquatch
 
@@ -101,7 +128,7 @@ which sasquatch
 sasquatch -version || sasquatch -h | head
 ```
 
-如果 `git clone` 太慢，可以先跳过 sasquatch，但 Tenda AC15 这类固件可能无法完整解包。比赛演示建议务必装好。
+如果 `git clone` 太慢，可以先跳过 sasquatch，但 Tenda AC15 这类固件可能无法完整解包。跑完整演示前先装好；Arch 可直接 `yay -S sasquatch`。
 
 ## 5. 从 GitHub 下载项目
 
@@ -109,8 +136,8 @@ sasquatch -version || sasquatch -h | head
 
 ```bash
 cd ~
-git clone https://github.com/KimLee-12138/FirmHound-CLI.git
-cd FirmHound-CLI
+git clone https://github.com/cyx-weimijiheheda/FirmHound.git
+cd FirmHound
 ```
 
 查看项目结构：
@@ -137,7 +164,7 @@ scripts/
 如果以后要更新代码：
 
 ```bash
-cd ~/FirmHound-CLI
+cd ~/FirmHound
 git pull
 ```
 
@@ -146,50 +173,36 @@ git pull
 进入项目目录：
 
 ```bash
-cd ~/FirmHound-CLI
+cd ~/FirmHound
 ```
 
-创建虚拟环境：
+一条命令建环境并安装（`make` 自己创建 `.venv`）：
+
+```bash
+make dev
+```
+
+`make dev` 依次执行 `python3 -m venv .venv`、`pip install -r requirements.txt`、`pip install -e .`。
+装完激活一次，`fsa` 就进 PATH：
+
+```bash
+source .venv/bin/activate      # 终端提示符出现 (.venv)
+fsa --help
+```
+
+手动等价写法（不想用 make 时）：
 
 ```bash
 python3 -m venv .venv
-```
-
-激活虚拟环境：
-
-```bash
-source .venv/bin/activate
-```
-
-激活后，终端前面通常会出现：
-
-```text
-(.venv)
-```
-
-升级 pip：
-
-```bash
-python -m pip install --upgrade pip setuptools wheel
-```
-
-安装依赖：
-
-```bash
-pip install -r requirements.txt
-pip install -e .
-```
-
-验证 CLI 是否安装成功：
-
-```bash
-fsa --help
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e .
 ```
 
 如果提示 `fsa: command not found`，使用下面的方式也可以：
 
 ```bash
-python -m fsa.cli --help
+fsa --help
 ```
 
 ## 7. 第一次环境自检
@@ -203,7 +216,7 @@ fsa doctor --json-output
 或者：
 
 ```bash
-python -m fsa.cli doctor --json-output
+fsa doctor --json-output
 ```
 
 正常情况下应该看到类似：
@@ -243,7 +256,7 @@ python -m pytest tests/unit/test_safety.py tests/unit/test_schemas.py -q
 再跑完整测试：
 
 ```bash
-python scripts/dev.py test
+make test
 ```
 
 代码风格检查：
@@ -252,7 +265,7 @@ python scripts/dev.py test
 python -m ruff check .
 ```
 
-如果完整测试耗时较久，拍演示视频时可以只展示：
+如果完整测试耗时较久，演示时可以只展示：
 
 ```bash
 python -m pytest tests/unit/test_safety.py tests/unit/test_schemas.py -q
@@ -264,19 +277,42 @@ python -m ruff check .
 FirmHound 默认安全策略只允许读取白名单目录。固件样本建议统一放到：
 
 ```bash
-~/FirmHound-CLI/firmware_samples/
+~/FirmHound/firmware_samples/
 ```
 
 创建目录：
 
 ```bash
-cd ~/FirmHound-CLI
+cd ~/FirmHound
 mkdir -p firmware_samples
 ```
 
-## 10. 把 Windows 里的固件复制到 Linux 虚拟机
+## 10. 把固件样本放进工作目录
 
-根据你的虚拟机类型，选择一种方式。
+固件可能来自本机下载、共享目录、U 盘、另一台机器或对象存储，按场景选一种方式。
+
+### 方式 D：容器 / 远程机器（推荐做法）
+
+容器运行时用 volume 挂载，避免把样本烤进镜像：
+
+```bash
+docker run --rm -it -v "$PWD/firmware_samples:/work/firmware_samples" \
+  -v "$PWD:/work" -w /work debian:12 bash
+```
+
+远程 Linux 主机直接从本机推过去（Linux/macOS 通用）：
+
+```bash
+scp ./firmware_samples/*.bin <用户名>@<主机>:~/FirmHound/firmware_samples/
+```
+
+也可以用 `wget`/`curl` 在目标机上直接取：
+
+```bash
+wget -P firmware_samples/ "https://<授权样本地址>/xxx.bin"
+```
+
+> 只下载**已获授权**的固件；安全策略会校验路径白名单（`firmware_samples/`、`tmp/`）。
 
 ### 方式 A：VMware / VirtualBox 共享文件夹
 
@@ -320,37 +356,38 @@ cp /media/$USER/USB/openwrt-23.05.0-ramips-mt7620-zbtlink_zbt-we826-16m-squashfs
 cp /media/$USER/USB/US_BE3LProV1.0mt_V16.03.60.62_cn_TDC01.bin firmware_samples/
 ```
 
-### 方式 C：用 scp 从 Windows 传到 Linux
+### 方式 C：用 scp 从另一台机器传进来
 
-先在 Linux 中查看 IP：
+先在目标 Linux 上查看 IP：
 
 ```bash
 ip addr
 ```
 
-找到类似 `192.168.x.x` 的地址。
-
-然后在 Windows PowerShell 里执行：
-
-```powershell
-scp "D:\揭榜挂帅——网络安全\US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin" <linux用户名>@<linux虚拟机IP>:~/FirmHound-CLI/firmware_samples/
-scp "D:\揭榜挂帅——网络安全\openwrt-23.05.0-ramips-mt7620-zbtlink_zbt-we826-16m-squashfs-sysupgrade.bin" <linux用户名>@<linux虚拟机IP>:~/FirmHound-CLI/firmware_samples/
-scp "D:\揭榜挂帅——网络安全\US_BE3LProV1.0mt_V16.03.60.62_cn_TDC01.bin" <linux用户名>@<linux虚拟机IP>:~/FirmHound-CLI/firmware_samples/
-```
-
-把 `<linux用户名>` 和 `<linux虚拟机IP>` 换成你自己的。
-
-如果 Linux 没有开 SSH 服务，先执行：
+找到类似 `192.168.x.x` 的地址。然后在源机器上执行（Windows PowerShell、macOS/Linux 终端同理，只需换路径写法）：
 
 ```bash
-sudo apt install -y openssh-server
+scp ./firmware_samples/*.bin <用户名>@<目标IP>:~/FirmHound/firmware_samples/
+
+# Windows PowerShell 写法
+scp "D:\firmware\US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin" <用户名>@<目标IP>:~/FirmHound/firmware_samples/
+```
+
+把 `<用户名>` 和 `<目标IP>` 换成你自己的。目标机没有 SSH 服务时按发行版安装：
+
+```bash
+sudo apt install -y openssh-server          # Debian / Ubuntu
+sudo dnf install -y openssh-server          # Fedora / RHEL
+sudo pacman -S --needed openssh             # Arch
+sudo zypper install -y openssh              # openSUSE
+sudo apk add openssh                        # Alpine
 sudo systemctl enable --now ssh
 ```
 
 ## 11. 确认固件已经放好
 
 ```bash
-cd ~/FirmHound-CLI
+cd ~/FirmHound
 ls -lh firmware_samples
 ```
 
@@ -387,7 +424,7 @@ fsa plan \
 
 ## 13. 演示 2：分析 Tenda AC15 固件
 
-这是最推荐拍视频的主案例。
+这是最推荐作为主演示的案例。
 
 ```bash
 fsa analyze firmware_samples/US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin \
@@ -470,7 +507,7 @@ python -m json.tool "$(find runs/demo-ac15-linux/evidence -type f | head -1)"
 
 - FirmHound 不只是输出最终结论。
 - 每个阶段有 evidence 和 decision。
-- 评委可以复核每条判断的来源。
+- 审阅者可以复核每条判断的来源。
 
 也可以直接使用新增的“漏洞证据账本”命令：
 
@@ -487,7 +524,7 @@ fsa explain demo-ac15-linux --candidate-id <candidate-id> --format markdown
 讲解重点：
 
 - `explain` 会把候选的 source、sink、调用链、支持证据、反证、十维评分和下一步建议集中展示。
-- 这体现的是“不是让大模型直接下结论，而是让系统建立可复核证据链”。
+- 这条链路的作用是让结论可复核：每条判断都能追到证据。
 
 ## 15. 演示 4：分析 OpenWrt WE826 固件
 
@@ -597,7 +634,7 @@ sed -n '1,220p' .github/workflows/ci.yml
 运行测试：
 
 ```bash
-python scripts/dev.py test
+make test
 ```
 
 运行 lint：
@@ -625,14 +662,14 @@ python -m json.tool benchmarks/CVEs/CVE-2017-17215/candidate.json | head -120
 - 有 CI。
 - 有历史 CVE fixture。
 - 有 Schema 契约。
-- 不是一次性脚本。
+- 可重复执行。
 
-## 19. 视频拍摄推荐顺序
+## 19. 演示录制建议顺序
 
 建议按这个顺序拍：
 
 ```bash
-cd ~/FirmHound-CLI
+cd ~/FirmHound
 source .venv/bin/activate
 
 fsa doctor --json-output
@@ -700,15 +737,19 @@ source .venv/bin/activate
 如果仍然不行，用：
 
 ```bash
-python -m fsa.cli --help
+fsa --help
 ```
 
 ### 20.2 `binwalk` 或 `unsquashfs` 找不到
 
-重新安装：
+按发行版重装（包名差异见 §3.2）：
 
 ```bash
-sudo apt install -y binwalk squashfs-tools
+sudo apt install -y binwalk squashfs-tools        # Debian / Ubuntu
+sudo dnf install -y binwalk squashfs-tools        # Fedora / RHEL
+sudo pacman -S --needed binwalk squashfs-tools    # Arch（binwalk 走 AUR）
+sudo zypper install -y binwalk squashfs           # openSUSE
+sudo apk add binwalk squashfs-tools               # Alpine
 ```
 
 ### 20.3 AC15 解包失败
@@ -729,27 +770,27 @@ sudo make install
 
 ### 20.5 `pytest` 很慢怎么办？
 
-视频里可以只跑轻量测试：
+演示时可以先跑轻量测试，把完整测试留到 CI：
 
 ```bash
 python -m pytest tests/unit/test_safety.py tests/unit/test_schemas.py -q
 ```
 
-完整测试可作为截图或补充材料展示。
+完整测试结果以 CI 为准，本地只做快速回归即可。
 
 ### 20.6 GitHub 下载很慢怎么办？
 
-可以在 Windows 先下载 zip，然后复制到 Linux：
+可以在任意机器下载 zip 后拷进环境：
 
 ```bash
-unzip FirmHound-CLI-main.zip
-cd FirmHound-CLI-main
+unzip FirmHound-main.zip
+cd FirmHound-main
 ```
 
-但正式演示更推荐 `git clone`，显得更规范。
+但长期使用更推荐 `git clone`，便于拉取更新与切分支。
 
-## 21. 推荐视频总结词
+## 21. 演示收尾总结词
 
 可以这样收尾：
 
-> FirmHound 展示的是一个完整的固件漏洞挖掘 CLI 智能体流程。它可以从自然语言任务规划开始，自动完成固件解包、攻击面识别、二进制审计、风险评分、反证验证和报告生成；同时通过安全策略、证据链和决策链保证分析过程可复现、可解释、可降级。对于正常固件，它能稳定跑通；对于加密固件，它不会伪造结果，而是明确提示需要解密材料。这正是我们面向比赛提交的核心产品能力。
+> FirmHound 覆盖固件漏洞挖掘的完整流程：自然语言任务规划、固件解包、攻击面识别、二进制审计、风险评分、反证验证、报告生成。安全策略、证据链和决策链保证过程可复现、可解释、可降级。正常固件能稳定跑通；加密固件会明确提示需要解密材料，不伪造结果。

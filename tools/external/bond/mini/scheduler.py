@@ -30,7 +30,7 @@ def generate_seeds(
 ) -> list[str]:
     """Generate ``n_variants`` seed request bodies honouring constraint priority.
 
-    Strategy (H-BOND.md §4.3):
+    Strategy (bond.md §4.3):
       1) every ``mandatory`` param gets a satisfier value (all variants),
       2) ``partial`` params take a satisfier in some variants and not others,
       3) ``none`` params get a random token.

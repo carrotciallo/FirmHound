@@ -1,5 +1,5 @@
 # Model runtime configuration.
-# 决赛环境：使用国内备案模型，OpenAI-compatible 端点。
+# 生产环境：使用国内备案模型，OpenAI-compatible 端点。
 
 runtimes:
   offline:

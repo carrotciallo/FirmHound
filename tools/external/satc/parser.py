@@ -281,7 +281,7 @@ def compute_confidence(
     trace_len: int,
     clustered: bool,
 ) -> float:
-    """Explainable confidence score (see docs/external/E-SaTC.md §6.3)."""
+    """Explainable confidence score (see docs/external/satc.md §6.3)."""
     score = 0.3
     if has_alert_addr:
         score += 0.25

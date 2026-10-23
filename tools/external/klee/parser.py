@@ -1,7 +1,7 @@
 """Parse KLEE ``klee-out-N/`` artifacts into normalized ``external_finding`` docs.
 
 KLEE (v3.2) writes a directory per symbolically-executed harness containing a
-mix of artifacts (G-KLEE.md §3, §6.2). This module turns each ``klee-out-N/``
+mix of artifacts (klee.md §3, §6.2). This module turns each ``klee-out-N/``
 into exactly one external finding carrying the KLEE-specific ``symex`` field:
 
   * ``*.err`` -- memory / assertion errors. ``ptr.err`` / ``free.err`` /

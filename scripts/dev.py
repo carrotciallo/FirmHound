@@ -1,7 +1,7 @@
-"""Cross-platform development task runner.
+"""开发任务脚本（Linux）。日常用 `make` 调用，也可以直接跑本文件。
 
 Usage:
-    python scripts/dev.py <command>
+    .venv/bin/python scripts/dev.py <command>
 
 Commands:
     help          Show this help message
@@ -15,8 +15,8 @@ Commands:
     format        Run ruff format
     clean         Remove build artifacts and caches
     smoke         Run end-to-end smoke test with fixture firmware
-    docker-build  Build Docker image
-    docker-run    Run one-shot analysis in Docker
+
+解释器优先用项目内的 .venv；没有 .venv 时退回当前 python，并在装依赖时报错提示先建环境。
 """
 
 from __future__ import annotations
@@ -28,27 +28,36 @@ import sys
 import uuid
 from pathlib import Path
 
-import structlog
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-PYTHON = sys.executable
-structlog.configure(
-    processors=[
-        structlog.processors.TimeStamper(fmt="iso", utc=True),
-        structlog.processors.JSONRenderer(),
-    ]
-)
-LOG = structlog.get_logger("dev")
+VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
+PYTHON = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+
+
+def _in_venv() -> bool:
+    return sys.prefix != sys.base_prefix
+
+
+def _require_venv(action: str) -> None:
+    """Refuse to install into the system interpreter."""
+    if _in_venv():
+        return
+    _log(
+        "not_in_venv",
+        action=action,
+        hint="先执行 `make venv`，或用 .venv/bin/python scripts/dev.py",
+    )
+    raise SystemExit(1)
+def _log(event: str, **fields: object) -> None:
+    """One-line log to stderr; keeps this script dependency-free."""
+    detail = " ".join(f"{key}={value}" for key, value in fields.items())
+    print(f"[dev] {event} {detail}".rstrip(), file=sys.stderr)
 
 
 def run(cmd: list[str] | str, *, cwd: Path | None = None) -> int:
     """Run a command and return its exit code."""
-    if isinstance(cmd, list):
-        LOG.info("command_start", command=cmd)
-    else:
-        LOG.info("command_start", command=cmd)
+    _log("command_start", command=cmd)
     return subprocess.call(cmd, shell=isinstance(cmd, str), cwd=cwd)
 
 
@@ -60,11 +69,13 @@ def cmd_help(args: argparse.Namespace) -> int:
 
 def cmd_install(args: argparse.Namespace) -> int:
     """Install production dependencies."""
+    _require_venv("install")
     return run([PYTHON, "-m", "pip", "install", "-r", "requirements.txt"], cwd=REPO_ROOT)
 
 
 def cmd_dev(args: argparse.Namespace) -> int:
     """Install editable package and dev dependencies."""
+    _require_venv("dev")
     rc = run([PYTHON, "-m", "pip", "install", "-r", "requirements.txt"], cwd=REPO_ROOT)
     if rc != 0:
         return rc
@@ -124,7 +135,7 @@ def cmd_ext_smoke(args: argparse.Namespace) -> int:
                 "limitation": f"{type(exc).__name__}: {exc}",
             }
     overall = "ok" if all(item["status"] == "ok" for item in results.values()) else "degraded"
-    LOG.info("external_probe_complete", status=overall, tools=results)
+    _log("external_probe_complete", status=overall, tools=results)
     return 0
 
 
@@ -162,10 +173,11 @@ def cmd_clean(args: argparse.Namespace) -> int:
                 if match.is_dir():
                     shutil.rmtree(match)
 
+    skip = {".venv", ".git", "node_modules"}
     for pycache in REPO_ROOT.rglob("__pycache__"):
-        if pycache.is_dir():
+        if pycache.is_dir() and not skip & set(pycache.parts):
             shutil.rmtree(pycache)
-    LOG.info("clean_complete", status="ok")
+    _log("clean_complete", status="ok")
     return 0
 
 
@@ -207,24 +219,10 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     )
 
 
-def cmd_docker_build(args: argparse.Namespace) -> int:
-    """Build Docker image."""
-    return run(["docker", "build", "-t", "fsa:latest", "."], cwd=REPO_ROOT)
-
-
-def cmd_docker_run(args: argparse.Namespace) -> int:
-    """Run one-shot analysis in Docker."""
-    runs_dir = REPO_ROOT / "runs"
-    return run(
-        ["docker", "run", "--rm", "-it", "-v", f"{runs_dir}:/workspace/runs", "fsa:latest"],
-        cwd=REPO_ROOT,
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     global parser  # noqa: PLW0603
     parser = argparse.ArgumentParser(
-        prog="dev.py", description="Cross-platform development task runner"
+        prog="dev.py", description="开发任务脚本（Linux；解释器优先取 .venv）"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -239,8 +237,6 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("format", help="Run ruff format")
     sub.add_parser("clean", help="Remove build artifacts and caches")
     sub.add_parser("smoke", help="Run end-to-end smoke test with fixture firmware")
-    sub.add_parser("docker-build", help="Build Docker image")
-    sub.add_parser("docker-run", help="Run one-shot analysis in Docker")
 
     args = parser.parse_args(argv)
     handlers = {
@@ -255,8 +251,6 @@ def main(argv: list[str] | None = None) -> int:
         "format": cmd_format,
         "clean": cmd_clean,
         "smoke": cmd_smoke,
-        "docker-build": cmd_docker_build,
-        "docker-run": cmd_docker_run,
     }
     return handlers[args.command](args)
 

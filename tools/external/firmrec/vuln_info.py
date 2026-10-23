@@ -1,6 +1,6 @@
 """Convert our 9-CVE knowledge base into FirmRec's ``vuln_info`` signature format.
 
-F-FirmRec.md §5.2 (X2) requires two ``vuln_info`` datasets:
+firmrec.md §5.2 (X2) requires two ``vuln_info`` datasets:
 
   * **official** -- FirmRec's own sample ``inout/vuln_info/`` (verify by running
     the upstream sample first, then copy its shape).
@@ -11,7 +11,7 @@ The upstream FirmRec repository ships its ``vuln_info`` as a JSON list of known
 vulnerabilities. We mirror that shape with the fields our fixtures actually carry
 (CVE id, device, vuln class, entry/source/sink, call chain, references).
 
-IMPORTANT (academic-integrity gate, F-FirmRec.md §5.2): the benchmark fixtures use
+IMPORTANT (academic-integrity gate, firmrec.md §5.2): the benchmark fixtures use
 *abstract* ``binary_id`` values (``bin-CVE-xxxx``), which are **not** real rootfs
 paths. Every record we emit is flagged ``presumed=True`` so downstream consumers
 never treat an inferred field as a verified fact.

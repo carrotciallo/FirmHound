@@ -16,7 +16,7 @@ bitcode 语义，**天然跨架构**——不需要 qemu、不需要真机、不
 ## 2. 关键约束（必读）
 
 - **只吃 LLVM bitcode（`.bc`）**，固件是 MIPS/ARM 二进制 → 必须拿到 bitcode。
-- `model.err` / `exec.err` **不是漏洞**，必须归到 `limitation`（否则误报比没接还多）。
+- `model.err` / `exec.err` 归到 `limitation`，不计为漏洞（否则误报比没接还多）。
 - `infeasible` 只说明"在我的 harness 模型下不可达"，**不等于真实固件不可达**。
 - 超时 / 路径爆炸**不改分**，只记 `limitation`。
 
@@ -64,7 +64,7 @@ bitcode 语义，**天然跨架构**——不需要 qemu、不需要真机、不
 python -m tools.external.adapter run_klee <run_dir> --config-path config/dev.yaml
 
 # 全链路（--depth full 下 SYMEX_PRUNE 自动路由到本工具）
-python scripts/dev.py test        # 仅跑单测（解包集成测试需宿主工具链）
+make test                         # 仅跑单测（解包集成测试需宿主工具链）
 pytest tests/unit/test_external_klee.py tests/unit/test_harness_gen.py tests/unit/test_external_klee_runner.py
 ```
 

@@ -1,6 +1,6 @@
 """M1 - entry-point identification and reachable-region extraction (mini-BOND X2).
 
-Replaces BOND's IDA-Pro CFG/CG export with a Ghidra-headless export (H-BOND.md §4.1).
+Replaces BOND's IDA-Pro CFG/CG export with a Ghidra-headless export (bond.md §4.1).
 When Ghidra is unavailable the functions degrade gracefully: ``export_cfg_cg`` returns
 an ``available=False`` dict (no exception), and ``identify_entry_points`` still works on
 any caller-supplied CFG/CG (used by the unit tests and by the BOND stage when a prebuilt

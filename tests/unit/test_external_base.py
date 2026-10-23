@@ -1,6 +1,6 @@
 """Unit tests for the ExternalAnalyzer base contract.
 
-Covers the two hard guarantees from E-SaTC.md F4:
+Covers the two hard guarantees from satc.md F4:
   * ``execute()`` must catch any exception from probe/prepare/run/parse and return
     ``status="failed"`` instead of propagating (so a broken tool never aborts the
     pipeline).

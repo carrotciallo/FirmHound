@@ -1,6 +1,6 @@
 # BOND 外部分析器 — Benchmark 与接入说明
 
-> 对应计划：`docs/external/H-BOND.md`
+> 对应计划：`docs/external/bond.md`
 > 工具定位：约束导向定向验证，尝试为 KLEE 保活候选取得真实仿真响应证据（CONSTRAINED_VALIDATION 阶段）
 > 安全模型：仅 `emulation` 目标 + 私有网段，PoC 必经 `sanitize_poc`
 
@@ -37,7 +37,7 @@ benchmarks/external/bond/
 - `scripts/run_external.py --tool bond --run-dir <dir>` 直接起，无需改代码。
 - 真实 `Bond_result/`、`fuzz_log/` 落盘到 `benchmarks/external/bond/raw/`。
 
-## 4. 红线（答辩必背）
+## 4. 红线（评审必查）
 
 1. **绝不打真机**：代码层硬断言 `target=emulation` + `is_private_ip`，违反即零出站。
 2. **PoC 必脱敏**：`poc_sanitized==false` 的 finding 直接丢弃，不进 `fused.json`。

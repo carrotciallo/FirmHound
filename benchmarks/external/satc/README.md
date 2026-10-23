@@ -46,4 +46,4 @@
 
 - 无 Web 前端的固件：`Clustering_result_v2.result` 很空，跨进程链路无数据。
 - 官方镜像较老：遇 angr 冲突优先用 `smile0304/satc`，不行再自 build（时间盒 1h）。
-- 现场策略（比赛时间紧）：只跑 `ref2sink_cmdi` + Top-1 二进制、关 `--taint_check`。
+- 短周期策略（时间受限）：只跑 `ref2sink_cmdi` + Top-1 二进制、关 `--taint_check`。

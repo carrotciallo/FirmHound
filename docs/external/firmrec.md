@@ -1,23 +1,20 @@
-# F 同学 · FirmRec 全量复现与集成计划
+# FirmRec 接入与复现计划
 
-> **你的任务**：把 FirmRec（CCS'24）从"容器起得来"做到"能对我们自己的固件跑出复发漏洞结论"，
-> 并**负责设计并实现 `recurrence_mode` 隔离机制**——这是全组唯一的"学术诚信闸门"。
+> 目标：把 FirmRec（CCS'24）从"容器起得来"做到"能对自有固件跑出复发漏洞结论"，并实现
+> `recurrence_mode` 隔离机制。验收标准见 §2 全量档 9 条。
 >
-> **基调：不是跑通 demo，是全量完成。** 你的验收标准见 §2 全量档 9 条。
->
-> **你的特殊性**：你的工具**不进主链**。这听起来像被边缘化，恰恰相反——
-> 你手上握着这个系统里**唯一需要防污染的能力**，以及比赛现场最可能快速出成果的一招：
-> **给了 CVE 之后，扫同厂商跨型号变体**。
+> FirmRec 不进主链。它是本项目唯一需要防污染的能力：已掌握某个 CVE 之后，扫同厂商跨型号、
+> 跨版本的变体。
 
 ---
 
 ## 1. 三句话讲清 FirmRec
 
 - **它解决什么**：**复发漏洞检测**（recurring vulnerability detection）。D-Link 某摄像头固件的洞，经过厂商间代码复用/定制，会以变体形式出现在 TP-Link 路由器上。FirmRec 用"基于利用过程的语义签名"去找这类变体。
-- **它补我们什么**：我们现在每个固件都是独立盲跑，完全不利用"这个洞在别处出现过"这条信息。
+- **补上的能力**：当前每个固件都是独立盲跑，完全不利用"这个洞在别处出现过"这条信息。
 - **它在链条哪**：**旁路**。不进 `unified_candidates`，单独落 `recurrence_findings.json`，报告单列一章。
 
-### 1.1 它的三个技术点（答辩会问）
+### 1.1 它的三个技术点（技术评审要点）
 
 1. **基于利用的漏洞签名**：不比语法，比"漏洞被利用过程中的语义特征"，对二进制代码改动更鲁棒。
 2. **Concolic execution 抽取签名**：从漏洞报告 + 有漏洞的二进制，符号执行生成签名。
@@ -30,12 +27,12 @@
 
 ## 2. 交付标准（三档）
 
-### 全量档（Full）—— 你的目标
+### 全量档（Full）
 
 | # | 项 | 具体判定 |
 |---|---|---|
 | **F1** 数据集全量 | L1 合成 + L2 DIR-859 + L3 两个真实固件 **全部跑完** `python -m firmrec.pipeline all` | 3 份 `recurrence_findings.json` |
-| **F2** 模式全量 | **两种模式都跑**：① 用 FirmRec 官方自带 `vuln_info` 跑一遍；② 用**我们自己整理的 9 个 CVE 漏洞集**跑一遍 | 2 组对照结果 |
+| **F2** 模式全量 | **两种模式都跑**：① 用 FirmRec 官方自带 `vuln_info` 跑一遍；② 用**自建的 9 个 CVE 漏洞集**跑一遍 | 2 组对照结果 |
 | **F3** Parser 全量 | 覆盖 **3 类产出**：`VULNS.md`、PostgreSQL 库表、`poc_info/` | 三类都有 fixture |
 | **F4** 单测全量 | VULNS.md 解析 + PG dump 解析 + 空结果 + 畸形行 + 版本差异，覆盖率 ≥80% | `pytest --cov` |
 | **F5** 接入全量 | registry 注册 + `scripts/run_external.py --tool firmrec` 可跑 + **旁路产物 `recurrence_findings.json` 正确落盘且不与主链混合** | 三条都通 |
@@ -44,19 +41,18 @@
 | **F8** 文档全量 | SKILL.md 含 7 节 + 踩坑表 + **隔离说明** | 文档齐 |
 | **F9** 性能基线 | 每固件耗时、PG 库体积、产物大小、是否需要 LLM key | 基线表 |
 
-### 你的两项独有交付（别人没有，你必须有）
+### 本工具独有的交付
 
 | # | 项 | 说明 |
 |---|---|---|
 | **X1** | **`recurrence_mode` 隔离机制** | 代码层硬断言 + 单测。这是全组的学术诚信闸门，见 §4 |
-| **X2** | **我们自己的 `vuln_info` 数据集** | 从 `benchmarks/CVEs/` 的 9 个 CVE 整理成 FirmRec 要求的格式 |
+| **X2** | **自建的 `vuln_info` 数据集** | 从 `benchmarks/CVEs/` 的 9 个 CVE 整理成 FirmRec 要求的格式 |
 
 ### 部分档 / 兜底档
 
 - **部分**：只跑官方自带 vuln_info，没跑自己的；或 PG 库表没解析出来；或隔离机制只有配置没有代码断言。
 - **兜底**：复现报告 + Skill 文档 + adapter 空壳 + fixture 单测。
-- ⚠️ **若全队只有 4 人**（见 `README.md` §1.1），你的优先级降到最低，
-  只做"环境跑通 + Skill 文档 + 接口预留"，其余时间支援主线兜底。
+- ⚠️ 人力紧张时本工具优先级最低：只做"环境跑通 + Skill 文档 + 接口预留"，其余时间支援主链。
 
 ---
 
@@ -101,12 +97,12 @@ python -m firmrec.pipeline all
 
 ### 4.1 为什么必须有
 
-FirmRec 的设计前提就是**吃已知漏洞签名**。而我们的核心卖点是**零 CVE 先验**，
-且 `第一队_系统研发与自动化流水线_详细计划.md` 第二十六条明令：
+FirmRec 的设计前提就是**吃已知漏洞签名**。而主轨的前提是**零 CVE 先验**，
+且团队早期的开发约定明令：
 **「不要把 CVE 名、PoC 或 Ground Truth 暗示给 Agent」**。
 
 如果 FirmRec 参与 Blind Benchmark，等于把 Ground Truth 喂给了系统，
-**整个 Benchmark 直接作废**。这是本项目最严重的一条红线，不是"注意一下"级别。
+**整个 Benchmark 直接作废**。这是本项目最严重的一条红线。
 
 ### 4.2 四道隔离（必须全部实现，缺一不可）
 
@@ -171,18 +167,18 @@ def test_recurrence_findings_saved_separately():
 
 ### 5.1 固件（与全组统一）
 
-L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你）。
+L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（L3 由数据准备环节统一下载后分发）。
 
-### 5.2 你独有的：`inout/vuln_info/` 数据集（X2）
+### 5.2 `inout/vuln_info/` 数据集（X2）
 
-**这是你的重点工程任务之一。** 两份都准备：
+两份都要准备：
 
 | 数据集 | 来源 | 用途 |
 |---|---|---|
 | **官方自带** | FirmRec 仓库 `inout/` 样例（README 提供下载） | 验证跑通，对照基线 |
-| **我们自己整理的** | 从 `benchmarks/CVEs/` 的 9 个 CVE（`attack_surface.json` / `candidate.json` / `verdict.json`）整理 | **这才是真家伙**——用我们自己的漏洞知识库做复发检测 |
+| **本项目整理** | 从 `benchmarks/CVEs/` 的 9 个 CVE（`attack_surface.json` / `candidate.json` / `verdict.json`）整理 | 用自有漏洞知识库做复发检测 |
 
-整理时先看 `inout/vuln_info/` 的现有格式（先跑通官方样例，再照格式填我们的 9 个 CVE）。
+整理时先看 `inout/vuln_info/` 的现有格式（先跑通官方样例，再照格式填自建的 9 个 CVE）。
 **9 个 CVE 的已知信息**（可从 fixture 直接提取）：
 
 | CVE | 漏洞类 | sink |
@@ -198,14 +194,14 @@ L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你
 | CVE-2023-32154 | — | 需读 fixture |
 
 > ⚠️ 注意：benchmark fixture 里的 `binary_id` 是抽象的 `bin-CVE-xxxx`，
-> **不是真实 rootfs 路径**。填 `vuln_info` 时需要你做一次"抽象 → 真实"的映射，
+> 抽象 id，不是真实 rootfs 路径。填 `vuln_info` 时需要做一次「抽象 → 真实」映射，
 > 映射表写进 `benchmarks/external/firmrec/vuln_info_mapping.md`，**说清楚哪些是推定的**。
 > 不要把推定当事实——这同样是诚信问题。
 
 ### 5.3 LLM 配置（可选但建议配）
 
 `config.yaml` 的 `llm_key` / `llm_url` / `llm_model`。
-**用我们自己的 `config/models.yaml` 里那套国内备案模型端点**（不要另开账号）。
+**用 `config/models.yaml` 里已配置的模型端点**（不要另开账号）。
 
 > ⚠️ **禁止用 `curl` / `wget`** 调模型（`config/safety.yaml` 已拉黑）。
 > 容器内配置走文件即可；如果 FirmRec 内部用 curl，记进踩坑表并考虑用 Python 侧预取结果。
@@ -214,7 +210,7 @@ L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你
 
 ## 6. 逐日排期（8/30 13:00 起）
 
-### 8/30（半天 + 晚上）—— 环境起步
+### 阶段 0 · 环境起步
 
 | 时间 | 任务 | 产出 |
 |---|---|---|
@@ -223,26 +219,26 @@ L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你
 | 16:00–18:00 | `make build`；`make start` 进容器；**确认 PostgreSQL 起来了**（`pg_isready`） | 容器可用 |
 | 18:00–20:00 | 下载并解压官方 `inout/` 样例；准备 `inout/firmware/images/` | 样例就位 |
 | 20:00–24:00 | **用官方样例跑第一遍 `python -m firmrec.pipeline all`**；记录耗时与产物 | 第一批产物 |
-| 21:00 | 四人同步会 | — |
+| 21:00 | 契约同步会 | — |
 
 **今日硬产出**：容器能起、PG 能连、官方样例跑通（哪怕只跑完一半 pipeline，也要知道卡在哪一步）。
 
 > ⚠️ base 镜像很大（Ghidra + JDK + Gradle + Miniconda），pull 可能要 30–60 分钟。
-> **这是你今天最优先的事**，早一秒开始早一秒有数据。
+> 优先级最高：这批数据是后续复现的前置。
 
-### 8/31 —— 全量复现日
+### 阶段 1 · 全量复现
 
 | 时间 | 任务 |
 |---|---|
 | 09:00–11:00 | 官方样例跑完；导出 PG 库表结构（`pg_dump -s`）；搞清楚库里哪张表存什么 |
-| 11:00–13:00 | **整理我们自己的 `vuln_info`**（9 个 CVE），写映射表 |
-| 13:00–18:00 | L2 DIR-859 + L3 两个固件，各跑两遍（官方 vuln_info / 我们自己的 vuln_info） |
+| 11:00–13:00 | **整理自建的 `vuln_info`**（9 个 CVE），写映射表 |
+| 13:00–18:00 | L2 DIR-859 + L3 两个固件，各跑两遍（官方 vuln_info / 自建 vuln_info） |
 | 18:00–20:00 | L1 合成固件跑一遍（合成固件是 x86，FirmRec 主要针对 MIPS/ARM，注意记录是否支持） |
 | 20:00–22:00 | 全部原始产物落盘 `tools/external/firmrec/fixtures/raw/`（含 **`pg_dump` 全量导出**）；写 `benchmarks/external/firmrec/README.md` |
 
 **今日硬产出**：3+ 固件 × 2 种 vuln_info 的产物；PG 库表 dump；映射表。
 
-### 9/1 —— Parser + 单测日
+### 阶段 2 · Parser 与单测
 
 | 时间 | 任务 |
 |---|---|
@@ -252,18 +248,18 @@ L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你
 | 17:00–20:00 | 写 `tests/unit/test_external_firmrec.py`：六类分支 |
 | 20:00–21:00 | `pytest --cov` ≥80% |
 
-### 9/2 —— 接入 + 联调日（⚠ 18:00 熔断）
+### 阶段 3 · 接入与联调（18:00 收口）
 
 | 时间 | 任务 |
 |---|---|
 | 09:00–11:00 | registry 声明（`tools/registry/external.yaml` 的 firmrec 那几行）；`run_external.py --tool firmrec` 跑通 |
 | 11:00–13:00 | **验证旁路隔离**：跑一次带 firmrec 的 full pipeline，确认 `unified_candidates.json` 里没有 firmrec 条目，`recurrence_findings.json` 正确落盘 |
 | 13:00–15:00 | **验证盲跑强制禁用**：跑 blind run，确认决策日志里有 `FORCED_DISABLE` 记录 |
-| 15:00–17:00 | 支援 E 做全链路联调（你的工具不进主链，时间上有余量） |
+| 15:00–17:00 | 配合全链路联调（本工具不进主链，时间有余量） |
 | 17:00–18:00 | 8 种开关组合降级测试 |
-| **18:00** | **熔断评审**：按 §2 三档给自己定档 |
+| **18:00** | **阶段收口评审**：按 §2 三档核对实际完成度 |
 
-### 9/3 —— 量化 + 文档日
+### 阶段 4 · 量化与文档
 
 | 时间 | 任务 |
 |---|---|
@@ -272,30 +268,30 @@ L1 合成 + L2 `DIR859_FW102b03.bin` + L3 两个（E 统一下载后分发给你
 | 16:00–19:00 | 写 `skills/08-external-analyzers/firmrec/SKILL.md`（7 节 + 踩坑表 + **隔离说明**） |
 | 19:00–21:00 | 写报告第 22 节「复发漏洞扫描（依赖已知漏洞签名）」的渲染模板 |
 
-### 9/4 —— 冻结 + 演示日
+### 阶段 5 · 冻结与演示
 
 - 代码冻结
 - 演示素材：**"用 DIR-859 的已知洞，在另一个固件上找到变体"**（如果实验成功，这是全场最炸的 3 分钟）
-- 答辩 Q&A 预案（见 §10）
+- 设计质询 Q&A 预案（见 §10）
 
 ---
 
 ## 7. 代码骨架
 
-### 7.1 文件清单（你负责）
+### 7.1 实现范围
 
 ```
 tools/external/firmrec/__init__.py
 tools/external/firmrec/runner.py          # FirmrecAnalyzer(ExternalAnalyzer)
 tools/external/firmrec/parser.py          # VULNS.md + PG dump + poc_info → external_finding
-tools/external/firmrec/vuln_info.py       # 把我们 9 个 CVE 转成 FirmRec 的 vuln_info 格式
+tools/external/firmrec/vuln_info.py       # 把自建的 9 个 CVE 转成 FirmRec 的 vuln_info 格式
 tools/external/firmrec/fixtures/raw/      # 真实产物（含 pg_dump）
 tools/registry/external.yaml              # firmrec 那几行
 tests/unit/test_external_firmrec.py
-tests/unit/test_recurrence_isolation.py   # ★ 隔离机制单测（你的独有交付）
+tests/unit/test_recurrence_isolation.py   # ★ 隔离机制单测（本工具独有交付）
 skills/08-external-analyzers/firmrec/SKILL.md
 benchmarks/external/firmrec/{README.md,comparison.md,vuln_info_mapping.md,raw/}
-docs/external/F-FirmRec.md
+docs/external/firmrec.md
 ```
 
 ### 7.2 runner.py 要点
@@ -344,22 +340,22 @@ docker exec <container> psql -U <user> -d firmrec -c \
 | `VULNS.md` | 检出的 CVE 编号 + 固件 + 二进制 | `finding_id`、`notes`、`evidence` |
 | PG 表（主结果表） | 匹配到的已知漏洞、目标二进制、函数地址、签名相似度 | `sink.addr`、`binary_id`、`confidence`（← 相似度）、`notes`（← 匹配到哪个已知 CVE） |
 | PG 表（入口表） | 输入入口函数 | `entry_point`、`source` |
-| `poc_info/` | PoC 信息 | `validation.poc_sanitized`（**必须过 H 的 sanitize 或复用其规则**） |
+| `poc_info/` | PoC 信息 | `validation.poc_sanitized`（**必须走 BOND 的 sanitize 或复用其规则**） |
 
 **confidence**：直接取 FirmRec 的签名相似度分数（如果有）；没有则按
 `0.5 + 0.3×相似度 + 0.2×(是否有入口证据)` 计算，并**在 notes 里写清公式**。
 
 **vuln_class**：从匹配到的已知 CVE 类型继承；未知则 `other`。
 
-### 7.4 与 H 的接口
+### 7.4 与 BOND 的接口
 
-你的 `poc_info` 解析**必须走 H 的脱敏器**：
+`poc_info` 解析**必须走脱敏器**：
 
 ```python
 from tools.external.bond.sanitize import sanitize_poc
 ```
 
-如果 H 还没写完，先用一个本地最小实现占位，并在 PR 里标注 `TODO(de=H)`。
+BOND 侧尚未就绪时，先用本地最小实现占位，并标注 `TODO(bond-sanitize)`。
 **不许不过脱敏就直接落盘。**
 
 ---
@@ -388,24 +384,24 @@ from tools.external.bond.sanitize import sanitize_poc
 | **base 镜像巨大** | pull 30–60 分钟，磁盘 20G+ | 今天第一件事就拉；磁盘不够先清理 `tmp/` |
 | **PostgreSQL 起不来** | `make start` 后 `psql` 连不上 | `make start` 里有 PG 初始化步骤；进容器手动 `service postgresql start`；查 `dataflow.conf` 与连接串 |
 | **`make build` 后改动不生效** | 改了源码/config 但容器里还是旧的 | **必须重跑 `make build`**，它会把源码重新拷进新镜像 |
-| **没有 LLM key 跑不完整** | pipeline 走到输入入口搜索就停 | 配 `config.yaml` 的 `llm_key/llm_url/llm_model`（用我们的国内备案模型端点）；不配也要跑，记录退化为哪种模式 |
-| **`vuln_info` 格式不对** | pipeline 报找不到字段 | **先跑通官方样例，再照抄格式**填我们的；不要凭空猜格式 |
-| **benchmark fixture 是抽象的** | `binary_id = bin-CVE-xxxx`，不是真实路径 | 做映射表，**明写哪些是推定的**（§5.2） |
+| **没有 LLM key 跑不完整** | pipeline 走到输入入口搜索就停 | 配 `config.yaml` 的 `llm_key/llm_url/llm_model`（用已配置的模型端点）；不配也要跑，记录退化为哪种模式 |
+| **`vuln_info` 格式不对** | pipeline 报找不到字段 | **先跑通官方样例，再照抄格式**填自建数据；不要凭空猜格式 |
+| **benchmark fixture 是抽象的** | `binary_id = bin-CVE-xxxx`，需映射到真实路径 | 做映射表，**明写哪些是推定的**（§5.2） |
 | LLM 调用被 curl 黑名单拦 | 容器内 curl 失败 | 记进踩坑表；考虑宿主机侧 Python 预取后写进 `inout/`，避开容器内网络调用 |
-| 合成固件是 x86 | FirmRec 主要针对 MIPS/ARM 固件 | 记录是否支持；不支持则 L1 不作为你的验收必需项（在 comparison 里注明） |
+| 合成固件是 x86 | FirmRec 主要针对 MIPS/ARM 固件 | 记录是否支持；不支持则 L1 不作验收必需项（在 comparison 里注明） |
 
 ---
 
-## 10. 答辩 Q&A 预案（**你是被问概率最高的一个**）
+## 10. 设计质询 Q&A
 
-**Q：FirmRec 要用已知漏洞，那你们「零 CVE 先验」的卖点还在吗？**
-A：还在，而且我们做了**四道隔离**：① 默认关闭；② 盲跑时由代码**强制断言**置为禁用，并在决策日志里留一条 `FORCED_DISABLE` 记录；③ 产出不进 `unified_candidates`，单独落 `recurrence_findings.json`；④ 报告单列一章，开头明写「本节结论依赖已知漏洞签名，不属于零先验能力，不计入 Blind Benchmark 指标」。FirmRec 解决的是**另一个问题**——比赛现场给了 CVE 之后，扫同厂商跨型号/跨版本的变体，这是最可能快速出成果的一招。
+**Q：FirmRec 依赖已知漏洞，是否影响零先验？**
+A：不影响。有四道隔离：① 默认关闭；② 盲跑时由代码**强制断言**置为禁用，并在决策日志里留一条 `FORCED_DISABLE` 记录；③ 产出不进 `unified_candidates`，单独落 `recurrence_findings.json`；④ 报告单列一章，开头明写「本节结论依赖已知漏洞签名，不属于零先验能力，不计入 Blind Benchmark 指标」。FirmRec 处理另一类问题：已掌握某个 CVE 后，扫同厂商跨型号、跨版本的变体。
 
-**Q：那它到底有没有用？给个数字。**
-A：看复发专项实验（§6 Day 9/3）：用 A 固件/A 组漏洞的签名，在 B 固件上检出多少变体。这个数字即使为 0 也有价值——说明我们这批固件属于不同代码谱系，这本身是个结论。
+**Q：实际效果如何？**
+A：见复发专项实验（§6 阶段 4）：用 A 固件/A 组漏洞的签名，在 B 固件上检出多少变体。这个数字即使为 0 也有价值——说明这批固件属于不同代码谱系，这本身是个结论。
 
-**Q：你们自己的 vuln_info 是怎么来的？会不会又泄露 Ground Truth？**
-A：来自我们已有的 9 个历史 CVE 知识库（用于方法论沉淀与回归验证，不是答案库）。整理时我做了映射表，**明确标注哪些字段是从抽象 fixture 推定的**，推定不等于事实。且这批数据**只在 recurrence 专项里用**，Blind Run 完全不加载。
+**Q：vuln_info 数据从哪来？会不会泄露 Ground Truth？**
+A：来自已有的 9 个历史 CVE 知识库，用于方法论沉淀与回归验证，不作答案库使用。整理时建了映射表，**标注哪些字段由抽象 fixture 推定**，推定不等于事实。这批数据**只在 recurrence 专项使用**，Blind Run 不加载。
 
 ---
 
@@ -420,4 +416,3 @@ A：来自我们已有的 9 个历史 CVE 知识库（用于方法论沉淀与�
 
 ---
 
-*你手上握着这个系统里唯一需要"防污染"的能力。把闸门做硬，比把工具跑通更重要。*

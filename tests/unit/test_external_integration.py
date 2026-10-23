@@ -1,7 +1,7 @@
 """Integration tests: registry resolution + F7 eight-switch degradation.
 
 These verify the external track degrades gracefully under every switch
-combination instead of aborting the pipeline (E-SaTC.md F7 / F5).
+combination instead of aborting the pipeline (satc.md F7 / F5).
 Docker is NOT required: with no SaTC image present, every tool resolves to
 ``skipped``, which is exactly the degradation we must guarantee.
 """

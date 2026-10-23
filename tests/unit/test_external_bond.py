@@ -1,4 +1,4 @@
-"""BOND integration tests (H-BOND.md §8.3 / §8.4): parser branches + safety gate + mini.
+"""BOND integration tests (bond.md §8.3 / §8.4): parser branches + safety gate + mini.
 
 The transport test touches loopback only. Safety-gate tests assert that a non-private
 target yields ``status="unsafe"`` with ZERO outbound artifacts.
@@ -144,7 +144,7 @@ def test_generate_seeds_priority() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# safety gate (H-BOND.md §8.4, hard requirement)
+# safety gate (bond.md §8.4, hard requirement)
 # --------------------------------------------------------------------------- #
 
 

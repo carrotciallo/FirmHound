@@ -1,12 +1,12 @@
 """BOND adapter: constraint-directed fuzzing validation (student H).
 
-BOND (H-BOND.md) closes the gap between *suspected* and *confirmed* in our pipeline.
+BOND (bond.md) closes the gap between *suspected* and *confirmed* in our pipeline.
 It consumes the candidates that survived KLEE's symbolic pruning (``symex.reachable``
 == True), extracts constraints, schedules bounded probes and validates them against an
 explicitly authorized emulated HTTP target. A finding is confirmed only when the real
 response contains the configured marker.
 
-Safety model (H-BOND.md §5, non-negotiable):
+Safety model (bond.md §5, non-negotiable):
   * The target MUST be ``emulation`` only. Before any network activity the four hard
     gates in :mod:`tools.emulation.safety_gate` are evaluated. A non-private target IP,
     missing authorization, a non-lab context, or a missing baseline => ``status="unsafe"``

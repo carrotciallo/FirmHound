@@ -1,5 +1,7 @@
 # 真实固件 CLI 回归记录（2026-09-02）
 
+> **已归档**：2026-09-02 的真实固件 CLI 回归记录。命令与路径是当时的 Windows 环境，现仅支持 Linux 原生。
+
 ## 样本与授权
 
 本轮使用用户提供并声明已授权的 3 份固件样本。实际测试在 `firmware_samples/` 白名单目录下的副本执行，未放宽 `config/safety.yaml`。
@@ -18,7 +20,7 @@
 4. fallback 会切出大量 gzip 噪声。已限制 gzip 命中，并在加密固件场景跳过 gzip 噪声 carving。
 5. `unsquashfs/sasquatch` 的输出目录不能预先存在，否则会失败或出现“返回成功但目录为空”。已按工具行为准备输出目录，并将空输出的成功判为失败。
 6. Windows 下固件 rootfs 的 Linux symlink 可能触发 `WinError 1920`。已让 rootfs 评分器容忍不可访问 symlink，并兼容 `etc_ro`、`webroot_ro` 等厂商只读布局。
-7. `fsa plan --firmware-path` 过去可能接受不存在路径。已改为早失败，减少比赛演示误操作。
+7. `fsa plan --firmware-path` 过去可能接受不存在路径。已改为早失败，减少演示时的误操作。
 8. CLI 现在可通过 `config/dev.yaml` 的 `tools.use_wsl_wrappers` 自动加载 `tools/wsl_wrappers`，`fsa doctor` 能看到 WSL 中的 `binwalk/unsquashfs`。（历史记录：该 Windows/WSL 适配层已在当前版本移除，仅支持 Linux 原生环境。）
 
 ## 固件分析摘要

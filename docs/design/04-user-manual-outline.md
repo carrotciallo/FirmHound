@@ -1,11 +1,11 @@
-# FirmHound 用户手册大纲
+# FirmHound 用户手册纲要
 
-> 定位：让老师、同学或评委能按文档把 CLI 跑起来。语言要比开发文档更“人话”，少讲源码，多讲怎么用、怎么看结果、遇到问题怎么办。
+> 用途：让第一次接触项目的人照着文档就能把 CLI 跑起来。语言要比开发文档更直白，少讲源码，多讲怎么用、怎么看结果、遇到问题怎么办。
 
 ## 0. 欢迎使用 FirmHound
 
 - 产品简介：FirmHound 是一个用于授权 IoT 固件漏洞挖掘的 CLI 工具。
-- 适合用户：安全研究人员、竞赛队员、实验室同学、设备安全评估人员。
+- 适合用户：安全研究人员、固件测试工程师、设备安全评估人员、运维与供应链审计人员。
 - 不适用场景：未授权测试、公网攻击、真实设备破坏性验证、无密钥加密固件强行解密。
 
 图表建议：
@@ -25,7 +25,7 @@
 - Python 3.11+
 - 项目源码
 - 至少一个授权固件或已解包 rootfs
-- Linux（Ubuntu 22.04+ / Debian 系）
+- Linux（发行版不限：Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE、Alpine 容器）
 - 可选：binwalk、unsquashfs、sasquatch、qemu
 
 图表建议：
@@ -53,43 +53,43 @@
 
 ### 2.3 安装验证
 
-```powershell
-python -m fsa.cli doctor --json-output
-python scripts/dev.py smoke
+```bash
+fsa doctor --json-output
+make smoke
 ```
 
 图表建议：
 
-- Windows/Linux 安装路线对照表。
+- 系统依赖与 Python 环境两步对照表。
 
 ## 3. 快速开始
 
 ### 3.1 分析已解包 rootfs
 
-```powershell
-python -m fsa.cli analyze <ROOTFS_DIR> `
-  --input-type rootfs `
-  --depth standard `
-  --authorization-holder "team-authorized" `
+```bash
+fsa analyze <ROOTFS_DIR> \
+  --input-type rootfs \
+  --depth standard \
+  --authorization-holder "team-authorized" \
   --run-id demo-rootfs
 ```
 
 ### 3.2 直接分析固件镜像
 
-```powershell
-python -m fsa.cli analyze firmware_samples\router.bin `
-  --input-type firmware `
-  --depth standard `
-  --authorization-holder "team-authorized" `
-  --vendor Tenda `
-  --model AC15 `
+```bash
+fsa analyze firmware_samples/router.bin \
+  --input-type firmware \
+  --depth standard \
+  --authorization-holder "team-authorized" \
+  --vendor Tenda \
+  --model AC15 \
   --run-id demo-ac15
 ```
 
 ### 3.3 查看结果
 
-```powershell
-python -m fsa.cli status demo-ac15 --json-output
+```bash
+fsa status demo-ac15 --json-output
 notepad runs\demo-ac15\report.md
 ```
 
@@ -105,9 +105,9 @@ notepad runs\demo-ac15\report.md
 
 常用命令：
 
-```powershell
-python -m fsa.cli doctor --json-output
-python -m fsa.cli doctor --include-external-probes --json-output
+```bash
+fsa doctor --json-output
+fsa doctor --include-external-probes --json-output
 ```
 
 怎么看：
@@ -120,14 +120,14 @@ python -m fsa.cli doctor --include-external-probes --json-output
 
 用途：只规划，不执行。
 
-适合比赛演示“任务理解”：
+适合演示“任务理解”能力：
 
-```powershell
-python -m fsa.cli plan `
-  --task "分析Tenda AC15固件，授权测试，完整分析" `
-  --firmware-path firmware_samples\US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin `
-  --authorization-holder team-authorized `
-  --depth full `
+```bash
+fsa plan \
+  --task "分析Tenda AC15固件，授权测试，完整分析" \
+  --firmware-path firmware_samples/US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin \
+  --authorization-holder team-authorized \
+  --depth full \
   --json-output
 ```
 
@@ -202,15 +202,15 @@ runs/<run_id>/
 
 命令：
 
-```powershell
-python -m fsa.cli analyze .\firmware_samples\US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin `
-  --input-type firmware `
-  --depth standard `
-  --authorization-holder team-authorized `
-  --vendor Tenda `
-  --model AC15 `
-  --version V15.03.05.19_multi_TD01 `
-  --run-id real-ac15-demo `
+```bash
+fsa analyze firmware_samples/US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin \
+  --input-type firmware \
+  --depth standard \
+  --authorization-holder team-authorized \
+  --vendor Tenda \
+  --model AC15 \
+  --version V15.03.05.19_multi_TD01 \
+  --run-id real-ac15-demo \
   --json-output
 ```
 
@@ -257,7 +257,7 @@ python -m fsa.cli analyze .\firmware_samples\US_AC15V1.0BR_V15.03.05.19_multi_TD
 
 静态扫描偏召回，最终要通过评分、反证、动态验证收敛。
 
-### 7.5 如何给老师演示？
+### 7.5 如何做一次完整演示？
 
 推荐演示顺序：
 

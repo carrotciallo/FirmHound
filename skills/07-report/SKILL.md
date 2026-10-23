@@ -10,10 +10,10 @@ tags: [report, verdict, compliance, m10, redaction]
 
 把整条流水线的产物（candidate / verdict / 证据 / 决策）汇集成**双产物**：
 
-- `report.md` — 人类可读，答辩 / 提交用；
+- `report.md` — 人类可读，交付 / 评审用；
 - `final_verdict.json` — 机器可读，平台判分 / 自动化用。
 
-核心原则：**可解释、可审计、如实、脱敏**。看到 `system`/`strcpy` ≠ 漏洞，报告必须基于证据链而非函数命中；全部 REJECT 时如实输出「未发现强证据」，严禁强行报漏洞。
+核心原则：**可解释、可审计、如实、脱敏**。看到 `system`/`strcpy` ≠ 漏洞，报告必须基于证据链，函数命中共现不构成结论；全部 REJECT 时如实输出「未发现强证据」，不强行报漏洞。
 
 ## 输入
 
@@ -56,7 +56,7 @@ tags: [report, verdict, compliance, m10, redaction]
 
 ## 执行流程
 
-1. **结论口径对齐**
+1. **结论表述对齐**
    - 五分类：confirmed-issue / high-confidence-candidate / false-positive / unknown / observation。
    - 裁决动作：ACCEPT（采纳）/ DOWNGRADE（降级）/ REJECT（拒绝）/ NEED_DYNAMIC（需动态验证）。
    - `observation` 级条目不进入评分，只入证据索引。

@@ -1,7 +1,7 @@
-"""FirmRec parser unit tests (F-FirmRec.md §8: six branches, >=80% coverage).
+"""FirmRec parser unit tests (firmrec.md §8: six branches, >=80% coverage).
 
 These tests parse *fixtures only* -- they never invoke the real FirmRec image or
-Docker (CI discipline from docs/external/README.md §3.3). Each fixture models one
+Docker (CI discipline from docs/archive/team-charter.md §3.3). Each fixture models one
 of the six parser branches plus the confidence formula.
 """
 

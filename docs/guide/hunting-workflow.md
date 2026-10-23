@@ -1,8 +1,8 @@
 # FirmHound 固件猎犬 · 小白全链路挖洞教程
 
 > 从「下载一个固件」到「拿到一份漏洞报告」，全程手把手。
-> 第二队同学实战专用 · 结合历史 CVE 复现过的品牌开展未知漏洞挖掘。
-> 本文假设你在 **Linux**（Ubuntu 22.04+ / Debian 系）上操作；WSL/Windows 不在支持范围内。
+> 面向新加入的工程师：跟着走一遍就能独立完成一次授权范围内的固件评估。
+> 本文假设你在 **Linux** 上操作，发行版不限（Debian/Ubuntu、Fedora/RHEL、Arch、openSUSE、Alpine 容器均可），只有包名和工具安装方式不同；Windows/WSL 不在支持范围内。
 
 ---
 
@@ -13,7 +13,7 @@
 | 环节 | 命令 | 依赖 |
 |---|---|---|
 | 下载固件 | 浏览器 / `wget` | — |
-| **解包固件** | `binwalk` / `sasquatch` / `unsquashfs` | Linux 工具链 |
+| **解包固件** | `binwalk` / `sasquatch` / `unsquashfs` | Linux 工具链（各发行版包名见 [deployment.md §3.2](deployment.md)） |
 | 静态分析 | `fsa analyze` | 纯 Python，无额外依赖 |
 | 人工审计 | `strings` / `readelf` / `objdump` / Ghidra | 可选 |
 | 动态验证 | `qemu-*-static` | 可选，需安全门四项全过 |
@@ -42,13 +42,12 @@ cd ~/FirmHound
 ### 1.2 建虚拟环境并安装
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
+make dev                        # 建 .venv + 装依赖 + editable 安装
+source .venv/bin/activate       # 让 fsa 进 PATH
 ```
 
-装完 `fsa` 命令就在当前 venv 里可用。以后每个新 shell 先 `source .venv/bin/activate`。
+`fsa` 装在 `.venv/bin`，每个新 shell 先 `source .venv/bin/activate`。不想用 make 时，手动跑
+`python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/pip install -e .`。
 
 ### 1.3 确认解包工具就绪（一次性）
 
@@ -62,7 +61,7 @@ which binwalk unsquashfs sasquatch strings readelf
 
 ```bash
 fsa doctor
-python scripts/dev.py test
+make test
 ```
 
 `fsa doctor` 显示 `status: ok`、测试最后一行看到全部 passed，就可以开始挖洞了。缺外部工具只会显示 degraded，不影响静态分析。
@@ -87,7 +86,7 @@ python scripts/dev.py test
 下载时注意：
 
 1. 选 **Router Firmware / 升级软件** 那一栏，别下用户手册；
-2. 文件一般是 `.zip` 或 `.bin`，下载完**解压 zip**，拿到真正的 `.bin` 固件文件；
+2. 文件一般是 `.zip` 或 `.bin`，下载完**解压 zip**，拿到 `.bin` 固件文件；
 3. 记录下载的**版本号**（如 V1.0.12.216），后面报告要用。
 
 ---
@@ -246,7 +245,7 @@ qemu-mips-static -L tmp/unpacked/_DIR-859_Ax_FW_113b03.bin.extracted/squashfs-ro
 | 问题 | 原因 | 解决 |
 |---|---|---|
 | `fsa: command not found` | 没激活 venv / 没 `pip install -e .` | `source .venv/bin/activate` 后重装 |
-| `binwalk: command not found` | 没装或不在 PATH | `sudo apt install binwalk`，或把 `~/.local/bin` 加进 PATH |
+| `binwalk: command not found` | 没装或不在 PATH | `pipx install binwalk`（跨发行版通用），或把 `~/.local/bin` 加进 PATH |
 | `rootfs not found: xxx` | rootfs 路径写错了 | 先 `ls tmp/unpacked` 确认目录存在 |
 | `Policy rejected` | 固件放白名单外 / 命令含黑名单词 | 固件放 `firmware_samples/`，别用 `rm -rf` |
 | 解包没出 rootfs | 固件加密 / 特殊格式 | 换 sasquatch 手动解，或 `fsa unpack-diagnose` 看建议 |

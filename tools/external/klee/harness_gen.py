@@ -17,7 +17,7 @@ host (if clang is available) or inside the *backend* (docker) where KLEE's LLVM
 toolchain lives. The runner drives that second
 step; this module only produces + (best-effort) compiles the source.
 
-Three bitcode strategies (see docs/external/G-KLEE.md §4):
+Three bitcode strategies (see docs/external/klee.md §4):
   * S1 source  -- candidate carries a ``source_path`` (synthetic firmware C);
   * S2 harness -- we generate the stub ourselves (the default, always available);
   * S3 binary  -- lift the ELF with mcsema/retDec (allowed to fail; honest attribution).
@@ -39,7 +39,7 @@ from typing import Any
 
 from tools.external.backends import run_local
 
-# Single source of truth for harness traceability (G-KLEE.md §6.3 / X2).
+# Single source of truth for harness traceability (klee.md §6.3 / X2).
 HARNESS_VERSION = "v1"
 
 # Default sizes used when the binary analysis could not recover them.
@@ -58,7 +58,7 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 class HarnessSpec:
     """Everything needed to synthesise a KLEE harness for one candidate.
 
-    Mirrors G-KLEE.md §4.2. All fields are optional-friendly so a partial binary
+    Mirrors klee.md §4.2. All fields are optional-friendly so a partial binary
     recovery still yields a runnable harness (we never block on missing data).
     """
 

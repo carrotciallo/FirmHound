@@ -7,7 +7,7 @@ MUST pass through :func:`sanitize_poc`. This is the single compliance gate for
     sanitize_poc(raw: str, *, strict: bool = True) -> tuple[str, bool]
     # -> (sanitized_text, poc_sanitized)
 
-Semantics of the return tuple (see H-BOND.md §5.1, §7.2):
+Semantics of the return tuple (see bond.md §5.1, §7.2):
 
 * ``poc_sanitized == True``  -> the text is safe to persist / render. The text
   may have been redacted (real IP -> ``<DEVICE_IP>``) but is otherwise usable.

@@ -1,4 +1,4 @@
-"""M2 constraint extraction (H-BOND.md §8.2).
+"""M2 constraint extraction (bond.md §8.2).
 
 Covers the three inference rules and the mandatory > partial > none priority ordering.
 """

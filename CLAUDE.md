@@ -6,10 +6,10 @@ FirmHound（固件猎犬）——IoT 固件漏洞挖掘自动化流水线：`解
 ## 快速上手
 
 ```bash
-pip install -r requirements.txt && pip install -e .
-fsa doctor                       # 环境自检
-python scripts/dev.py test       # 单元测试（318 passed / 1 skipped 为当前基线）
-python scripts/dev.py lint       # ruff（版本按 requirements.txt）
+make dev                         # 建 .venv + 装依赖 + editable 安装
+make doctor                      # 环境自检
+make test                        # 单元测试（336 passed / 1 skipped 为当前基线）
+make lint                        # ruff（版本按 requirements.txt）
 
 fsa analyze tmp/unpacked/x/squashfs-root --input-type rootfs \
   --authorization-holder "设备所有者" --depth standard --run-id hunt1
@@ -50,6 +50,13 @@ fsa analyze tmp/unpacked/x/squashfs-root --input-type rootfs \
 4. **不允许编造结论**：缺工具/超时 → `degraded|skipped` + `limitation`，不要补"看起来合理"的结果。
 5. **解析外部工具输出要固定 `LC_ALL=C`**（`run_command(..., env={"LC_ALL": "C"})`）；
    中文 locale 下 `readelf` 的字段名会被本地化，曾导致架构识别静默退化成 `unknown`。
+
+## 提交约定
+
+- 提交前跑 `make lint && make test && make doctor`，三项干净再提交。
+- **commit message 禁止 agent 署名**：不加 `Co-Authored-By: Claude` 等共同作者行，不写
+  `Generated with ...`、`🤖`、工具名或模型名尾注；作者用本机配置的开发者身份，不加 `--author`。
+- 提交信息前缀：`feat: / fix: / docs: / refactor: / test:`。
 
 ## 测试约定
 

@@ -6,12 +6,12 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-320%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-336%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
 
-*第一队 · 挑战杯「揭榜挂帅」· 具备自主决策能力的通用网络安全智能体*
+*本地运行，默认离线；工具缺失时降级，不中断主链*
 
 </div>
 
@@ -39,39 +39,40 @@
 - [安全与合规](#安全与合规)
 - [测试](#测试)
 - [常见问题（FAQ）](#常见问题faq)
+- [文档导航](#文档导航)
 - [许可证](#许可证)
 
 ---
 
 ## 项目简介
 
-**FirmHound（固件猎犬）** 是一套面向 IoT 固件漏洞挖掘的自动化流水线系统：把「固件解包 → 攻击面排查 → 二进制分析 → 静态数据流审计 → 十维风险评分 → 反证验证 → 本地动态验证 → 证据报告」这一完整流程，封装为**可编排的 Skill 知识库 + 确定性 Python 工具链**。
+**FirmHound（固件猎犬）** 是面向 IoT 固件漏洞挖掘的命令行流水线。解包、攻击面排查、二进制分析、静态数据流审计、风险评分、反证验证、动态验证、报告生成串成一条链：阶段机负责调度与恢复，Skill 提供判断规则，Python 工具负责确定性执行。
 
-**设计目标**：比赛现场给出的 CVE 是**现场新给、未知的**。因此系统不依赖任何 CVE 特征硬编码，而是靠**通用规则 + 可复用 Skill** 发现未知漏洞——零先验知识即可从陌生固件中定位高危候选。
+**设计目标**：不依赖 CVE 特征硬编码，靠通用规则和可复用 Skill 在未见过的固件上完成首轮筛查。
 
-命名含义：**Firm**（Firmware 固件）+ **Hound**（猎犬），寓意像猎犬一样凭借敏锐嗅觉，追踪、挖掘固件中隐藏的漏洞。
+命名取自 **Firm**（Firmware）+ **Hound**（猎犬），指在固件里循迹追踪。
 
 ## 核心特性
 
 | 特性 | 说明 |
 |---|---|
 | 🐾 全流程自动化 | M0–M14 模块化，阶段机驱动（`fsa/orchestrator/engine.py`），支持断点续跑 |
-| 🎯 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配现场新固件 |
+| 🎯 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配未见过的固件 |
 | 🐍 纯 Python 分析 | pyelftools + capstone 解析 ELF，Linux 原生运行，不强制依赖 Ghidra/objdump |
-| 🔌 双运行时 | `offline`（确定性离线规则，不生成模型结论） / `openai_compatible`（国内备案模型） |
+| 🔌 双运行时 | `offline`（确定性离线规则，不生成模型结论） / `openai_compatible`（OpenAI 兼容端点） |
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
-| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 21 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，300+ 项测试持续守护 |
+| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 22 节骨架，静态结论保留反证与限制 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，336 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
 ```bash
-# ① 安装 CLI 并自检
-python -m pip install -e .
-fsa doctor
-python scripts/dev.py test
+# ① 建 .venv、装依赖、自检
+make dev
+make doctor
+source .venv/bin/activate        # 让 fsa 进 PATH（fish: source .venv/bin/activate.fish）
 
 # ② 分析已解包 rootfs（授权主体为必填项）
 fsa analyze tmp/unpacked/squashfs-root --input-type rootfs \
@@ -119,66 +120,120 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
 
 ## 环境配置（Linux）
 
-> 本项目只支持 **Linux 原生**环境（物理机 / 服务器 / 云主机 / 容器均可）。
-> 静态分析层是纯 Python（pyelftools/capstone），解包与动态验证依赖 Linux 工具链（binwalk / sasquatch / qemu）。
+> 支持主流 Linux 发行版，glibc 与 musl 均可：Debian/Ubuntu、Fedora/RHEL/CentOS Stream/Rocky/Alma、Arch/Manjaro、openSUSE Leap/Tumbleweed、Alpine（容器）。
+> 静态分析层是纯 Python（pyelftools/capstone），不依赖系统包；解包与动态验证依赖下表的宿主工具，缺失只会让对应阶段降级，不会中断。
 
-### 1. 安装系统依赖
+### 1. 依赖能力矩阵
+
+| 依赖 | 用途 | 必需性 | Debian/Ubuntu | Fedora/RHEL 系 | Arch/Manjaro | openSUSE | Alpine |
+|---|---|---|---|---|---|---|---|
+| `binwalk` | 固件签名扫描与自动解包 | 必需 | `binwalk` | `binwalk` | AUR `binwalk` | `pipx install binwalk` | `pipx install binwalk` |
+| `unsquashfs` | 标准 SquashFS 解包 | 必需 | `squashfs-tools` | `squashfs-tools` | `squashfs-tools` | `squashfs` | `squashfs-tools` |
+| `sasquatch` | 非标准 SquashFS（多数路由固件） | 强烈建议 | 源码编译 | 源码编译 | AUR `sasquatch` | 源码编译 | 源码编译 |
+| `cpio` | initramfs、部分容器格式 | 必需 | `cpio` | `cpio` | `cpio` | `cpio` | `cpio` |
+| `7z` | ZIP / 7z / LZMA 容器 | 建议 | `p7zip-full` | `p7zip p7zip-plugins` | `p7zip` | `p7zip` | `p7zip` |
+| `file` | 文件类型识别 | 必需 | `file` | `file` | `file` | `file` | `file` |
+| `readelf` `strings` | ELF 头解析、字符串提取 | 必需 | `binutils` | `binutils` | `binutils` | `binutils` | `binutils` |
+| `qemu-<arch>-static` | 用户态动态验证 | 可选 | `qemu-user-static` | `qemu-user-static` | AUR `qemu-user-static` | `qemu-linux-user` | `qemu-arm` `qemu-mipsel` … |
+| `gcc` `make` | 编译 sasquatch / harness | 必需 | `build-essential` | `gcc make` | `base-devel` | `gcc make` | `build-base` |
+| `python3` + venv | 运行 CLI | 必需 | `python3 python3-venv python3-dev` | `python3 python3-devel` | `python` | `python3 python3-devel` | `python3 py3-pip` |
+
+### 2. 一条命令装齐（按发行版选一行）
 
 ```bash
-# Debian / Ubuntu 系
+# Debian / Ubuntu（含 Kali、Raspberry Pi OS）
 sudo apt update && sudo apt install -y \
-    binwalk squashfs-tools cpio p7zip-full p7zip-rar file \
-    build-essential binutils qemu-user-static qemu-system-arm \
-    python3 python3-pip python3-venv python3-dev git
+    binwalk squashfs-tools cpio p7zip-full file binutils \
+    build-essential qemu-user-static python3 python3-venv python3-dev git pipx
 
-# Fedora / RHEL 系
-sudo dnf install -y binwalk squashfs-tools cpio p7zip p7zip-plugins file \
-    gcc make binutils qemu-user-static qemu-system-arm python3 python3-pip git
+# Fedora / RHEL / CentOS Stream / Rocky / AlmaLinux
+sudo dnf install -y binwalk squashfs-tools cpio p7zip p7zip-plugins file binutils \
+    gcc make qemu-user-static python3 python3-devel git pipx
+
+# Arch / Manjaro（binwalk 与 qemu-user-static 在 AUR）
+sudo pacman -S --needed squashfs-tools cpio p7zip file binutils base-devel python git
+yay -S --needed binwalk sasquatch qemu-user-static
+
+# openSUSE Leap / Tumbleweed
+sudo zypper install -y squashfs cpio p7zip file binutils gcc make qemu-linux-user \
+    python3 python3-devel git
+pipx install binwalk
+
+# Alpine（容器内）
+apk add squashfs-tools cpio p7zip file binutils build-base python3 py3-pip git \
+    qemu-arm qemu-aarch64 qemu-mipsel
+pipx install binwalk
 ```
 
-### 2. 安装 sasquatch（非标准 SquashFS，强烈建议）
+> 包名以各发行版仓库实际为准；`dnf` 在 RHEL 8 上可能需先 `subscription-manager` 或启用 EPEL。
+> 容器内跑完整流程时建议用 `debian:12` / `ubuntu:24.04` 基础镜像，工具链最齐；Alpine 适合只要静态分析的轻量场景。
+
+### 3. 安装 sasquatch（非标准 SquashFS，强烈建议）
 
 ```bash
-cd /tmp
-git clone --depth 1 https://github.com/onekey-sec/sasquatch.git
-cd sasquatch
-make && sudo make install
+git clone --depth 1 https://github.com/onekey-sec/sasquatch.git /tmp/sasquatch
+cd /tmp/sasquatch && make && sudo make install
 ```
 
-> 很多路由固件用非标准 SquashFS（`squashfs:little endian` 变体），`unsquashfs` 解不了，必须用 sasquatch。
+> 多数路由固件用非标准 SquashFS（`squashfs:little endian` 变体），`unsquashfs` 解不了，必须用 sasquatch。Arch 可直接从 AUR 装，免编译。
 
-### 3. 安装 Python 与项目依赖
+### 4. 安装 Python 与项目依赖
 
 ```bash
 cd <项目路径>
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
+make dev          # 创建 .venv + 装 requirements + pip install -e .
 ```
 
-### 4. 验证
+`make dev` 做三件事：`python3 -m venv .venv`、装 `requirements.txt`、以 editable 方式装本项目。
+之后所有目标都在 `.venv` 内执行，不污染系统 Python；换解释器用 `make dev PYTHON=python3.12`。
+
+手动等价写法：
 
 ```bash
-fsa doctor
-python scripts/dev.py test
-which binwalk unsquashfs sasquatch strings readelf
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e .
 ```
 
-`fsa doctor` 会检查路径、Schema、运行时与外部工具；缺工具只报 degraded，不会阻断静态分析。
+Debian/Ubuntu 若报 `ensurepip is not available`，先装 `python3-venv`；Alpine 装 `python3 py3-pip` 即可（musl 下 `capstone` 有预编译 wheel，`pyelftools` 纯 Python）。
 
-### 5. 常见问题
+只想装命令、不开发源码时，用 pipx 隔离安装：
+
+```bash
+pipx install .
+```
+
+### 5. 验证
+
+```bash
+make doctor                         # 路径、Schema、运行时、外部工具
+make test                           # 单元测试
+for t in binwalk unsquashfs sasquatch strings readelf 7z; do
+    printf '%-12s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+done
+```
+
+`fsa doctor` 的输出里会带当前发行版信息（`platform.family` / `package_manager` / `libc`）；
+缺工具时按**当前发行版**给出安装提示（如 Fedora 上是 `dnf: squashfs-tools`，openSUSE 上是 `zypper: squashfs`），
+并且只报 degraded，静态分析照常可用。
+
+```bash
+fsa doctor --json-output | python3 -m json.tool | sed -n '1,40p'
+```
+
+### 6. 常见问题
 
 | 问题 | 原因 | 解决 |
 |---|---|---|
 | `binwalk -e` 解不出内容 | 固件加密 / 自定义头 | 换 `sasquatch` 手动解；或 `binwalk --extract --signature` 逐段看签名 |
 | `ModuleNotFoundError: No module named 'capstone'` | 依赖没装 | `pip install -r requirements.txt` 重装 |
 | `Permission denied` 运行脚本 | 可执行位缺失 | `chmod +x scripts/*.sh` |
-| QEMU 缺架构 | 不同架构固件需不同 qemu | `sudo apt install qemu-user-static`（已含常见架构） |
-| `pip` 报 externally-managed-environment | 新版 Debian/Ubuntu 限制 | 用 venv（本项目推荐），或 `pip install --break-system-packages` |
-| `binwalk: command not found` | PATH 未含 `~/.local/bin` | `export PATH="$HOME/.local/bin:$PATH"`，或重装 binwalk |
+| QEMU 缺架构 | 不同架构固件需不同 qemu | Debian 系装 `qemu-user-static`；Alpine 按架构装 `qemu-<arch>`；或用 `fsa` 的 `emulation` 阶段内置镜像 |
+| `pip` 报 externally-managed-environment | PEP 668 保护（Debian/Ubuntu/Fedora 均有） | 用 venv 或 pipx，不要 `--break-system-packages` 污染系统 |
+| `binwalk: command not found` | 未装或不在 PATH | `pipx install binwalk`；`~/.local/bin` 加进 PATH |
+| `unsquashfs: command not found` | 包名随发行版不同 | Debian/Fedora/Arch/Alpine 装 `squashfs-tools`，openSUSE 装 `squashfs` |
 | 解包目录里有打不开的符号链接 | 固件含指向 `/dev/null` 的悬空链接 | 属正常现象，CLI 已做符号链接容错（`fsa/utils/traverse.py`） |
-| 能在 Windows 上跑吗 | 不支持 | 本项目已移除 Windows/WSL 适配层，请在 Linux 或容器内运行 |
+| 能在 Windows / macOS 上跑吗 | 解包与仿真工具链是 Linux 原生 | 用容器或远程 Linux 主机；本项目不提供 Windows/WSL 适配层 |
 
 ---
 
@@ -213,7 +268,7 @@ binwalk -e -M firmware_samples/DIR859_FW102b03.bin -C tmp/unpacked
 - `-e` 提取；`-M` 递归提取（固件里可能有嵌套压缩层）
 - `-C` 指定输出目录
 
-**找到 rootfs**：解包后通常出现 `tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root`，里面应有 `bin/`、`etc/`、`usr/`、`www/`（或 `htdocs/`）等目录——**这就是分析目标 rootfs**。
+**找到 rootfs**：解包后通常出现 `tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root`，里面应有 `bin/`、`etc/`、`usr/`、`www/`（或 `htdocs/`）等目录，**这就是分析目标 rootfs**。
 
 ```bash
 # 找不到 squashfs-root 时，列出解包结果
@@ -311,12 +366,12 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
 | `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
-| `python scripts/dev.py smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |
-| `python scripts/dev.py test` | 跑全部单元测试 | — |
-| `python scripts/dev.py test-all` | 单元测试 + 主机相关集成测试 | — |
-| `python scripts/dev.py ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
-| `python scripts/dev.py lint` | ruff 代码检查 | — |
-| `python scripts/dev.py format` | 自动格式化 | — |
+| `make smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |
+| `make test` | 跑全部单元测试 | — |
+| `make test-all` | 单元测试 + 主机相关集成测试 | — |
+| `make ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
+| `make lint` | ruff 代码检查 | — |
+| `make format` | 自动格式化 | — |
 | `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
 | `python scripts/run_e2e.py --fixture-mode ...` | 合成样本回归（必须显式确认 fixture 模式） | 演练产物 |
 | `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
@@ -330,7 +385,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `config/safety.yaml` | 安全红线（路径白名单 / 命令黑名单 / 网络白名单） | ✅（**不要改**） |
 | `.env` | 模型 API Key 等环境变量（参考 `.env.example`） | 可选 |
 
-**启用 LLM 运行时**（决赛场景）：
+**启用 LLM 运行时**（可选，默认离线）：
 
 ```yaml
 # config/models.yaml
@@ -361,7 +416,11 @@ export OPENAI_API_KEY=sk-xxx
 ├── tmp/                    # 解包产物
 ├── runs/                   # 分析报告与 JSON 产物
 ├── tests/                  # 单元 / 集成测试（CI 不依赖外部重型工具）
-└── docs/                   # 设计文档、挖洞教程、外部分析器说明
+└── docs/                   # 文档（索引见 docs/README.md）
+    ├── guide/              #   部署与演示、挖洞教程、CLI 测试方案
+    ├── external/           #   外部分析器：总纲、数据集、真机测试、四工具细则
+    ├── design/             #   设计与交付文档纲目（01–09）
+    └── archive/            #   历史记录：分工总纲、回归记录、差距分析
 ```
 
 ## Skill 体系
@@ -387,7 +446,7 @@ RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描�
 
 四器全部是可选增强：总开关和单工具开关默认关闭；缺镜像、缺 KLEE、超时或解析失败
 都必须返回结构化 `status + limitation`，不能阻断主报告。安装、能力边界和复现状态见
-`docs/external_analyzers.md`。
+`docs/external/README.md`。
 
 ## 评分与结论模型
 
@@ -411,9 +470,9 @@ RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描�
 ## 测试
 
 ```bash
-python scripts/dev.py test    # 确定性单元测试（CI 主门）
-python scripts/dev.py test-all # 含可选宿主工具集成测试
-python scripts/dev.py lint    # ruff 全绿
+make test      # 确定性单元测试（CI 主门）
+make test-all  # 含可选宿主工具集成测试
+make lint      # ruff 全绿
 ```
 
 - 单元测试覆盖：Schema / 工具 / 编排 / Verifier / 评分 / 动态验证 / Skill 加载 / e2e
@@ -431,8 +490,8 @@ python scripts/dev.py lint    # ruff 全绿
 **Q3：怎么接入国产大模型？**
 编辑 `config/models.yaml` 的 `openai_compatible` 段，设置 `OPENAI_API_KEY` 环境变量，`config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时只返回明确的 degraded 状态，不生成替代模型结论。
 
-**Q4：比赛现场给新固件，系统能发现漏洞吗？**
-能。系统不依赖 CVE 特征硬编码：`run_e2e.py` 演练证明零 CVE 先验可检出植入命令注入。现场流程 = 放置固件 → 解包 → 分析 → 人工审计 → 报告。
+**Q4：面对一个完全陌生的固件，系统能发现漏洞吗？**
+能。系统不依赖 CVE 特征硬编码：`run_e2e.py` 的端到端演练证明零先验可检出植入的命令注入。标准流程 = 放置固件 → 解包 → 分析 → 人工审计 → 报告。
 
 **Q5：报告里会不会出现可武器化内容？**
 不会。Skill 07 强制 8 项合规扫描 + 脱敏渲染，真实 IP / 反弹 shell 等以占位符替代；未标记 `poc_sanitized=true` 的外部验证证据会被拒绝。
@@ -440,9 +499,24 @@ python scripts/dev.py lint    # ruff 全绿
 **Q6：怎么查看报告？**
 `runs/<任务名>/report.md` 是 Markdown；`analysis.json` 是结构化结果。也可以把 report.md 交给 WorkBuddy 渲染成网页。
 
+## 文档导航
+
+完整索引见 [`docs/README.md`](docs/README.md)。按目的分四类：
+
+| 我想… | 看这里 |
+|---|---|
+| 在 Linux 上从零装好并录制演示 | [`docs/guide/deployment.md`](docs/guide/deployment.md)（含 7 个演示脚本与常见问题） |
+| 用 CLI 从固件挖到漏洞 | [`docs/guide/hunting-workflow.md`](docs/guide/hunting-workflow.md)（选目标 → 解包 → 分析 → 10 问审计） |
+| 提交前跑一遍自测 | [`docs/guide/cli-testing.md`](docs/guide/cli-testing.md) |
+| 接入 SaTC / FirmRec / KLEE / BOND | [`docs/external/README.md`](docs/external/README.md)（编排、开关、降级边界） |
+| 准备外部工具的机器与固件 | [`docs/external/field-testing.md`](docs/external/field-testing.md) + [`dataset.md`](docs/external/dataset.md) |
+| 查某个工具的接入细节 | [`satc.md`](docs/external/satc.md) · [`firmrec.md`](docs/external/firmrec.md) · [`klee.md`](docs/external/klee.md) · [`bond.md`](docs/external/bond.md) |
+| 写设计与交付文档（设计/实现/测试/手册/报告） | [`docs/design/`](docs/design/)（01–09 编号纲目） |
+| 看历史决策与回归证据 | [`docs/archive/`](docs/archive/)（只读，不代表当前实现） |
+
 ## 许可证
 
-MIT © 第一队 · 挑战杯「揭榜挂帅」专项赛
+MIT © FirmHound Contributors
 
 ---
 

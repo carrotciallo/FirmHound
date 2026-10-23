@@ -8,12 +8,12 @@ tags: [external, satc, taint, ghidra, angr, m-external]
 
 > 角色：作为 E（外部分析组组长）的实战手册。把 SaTC（USENIX Security 2021,
 > NSSL-SJTU/SaTC）接入 FirmHound 流水线，产出标准化的 `external_finding`。
-> 本 Skill 是「方法论 + 排错表」，不是 CVE 答案库——靠通用解析，不靠硬编码。
+> 本 Skill 提供方法论与排错表，靠通用解析定位，不依赖 CVE 特征库。
 
 ## 1. 目标
 
 用 SaTC 从固件 *Web 前端关键字* 定位 *后端二进制入口*，再用 Ghidra 找 sink、
-angr 做污点传播，产出真正的 `source → ... → sink` 跨函数路径。它补的是主轨
+angr 做污点传播，产出 `source → ... → sink` 跨函数路径。它补的是主轨
 （同文件 `imports ∩ {system,sprintf}` 共现判断）完全没有的**跨函数 / 跨进程数据流**。
 
 **关键增量**：`ref2share` + `share2sink` 链路覆盖「数据先写进 nvram/env，再被另一
@@ -77,7 +77,7 @@ external:
     memory: 16g
 ```
 
-**现场策略**（比赛时间紧）：只跑 `ref2sink_cmdi` + Top-1 二进制、关 `--taint_check`，
+**短周期策略**（时间受限）：只跑 `ref2sink_cmdi` + Top-1 二进制、关 `--taint_check`，
 压到 20–30 分钟。全量 4 配置（带/不带 taint × 4 脚本 × 多二进制）是离线 benchmark 才跑。
 
 ## 6. 验收与降级（F7 八档不 abort）
@@ -104,14 +104,14 @@ external:
 | 官方镜像老 | Python/angr 版本冲突，`satc.py` 起不来 | 优先 `smile0304/satc`；不行 `docker build . -t satc`（时间盒 1h，超了用不带 `--taint_check` 模式） |
 | Ghidra OOM | 容器被 kill，`ghidra_extract_result` 空 | `--memory=16g` 且降并发；仍失败只跑 Top-1（`-b`）而非 `-l 3` |
 | 跑太慢 | 单固件 90min，4 配置×3 固件 = 18h | 分级全量：4 脚本**全跑不带 taint**，再对 Top-1 二进制跑带 taint 慢模式，时间砍 60% |
-| 无 Web 前端 | `Clustering_result_v2.result` 很空 | 工具固有局限，记 `limitation`，不是你的锅 |
+| 无 Web 前端 | `Clustering_result_v2.result` 很空 | 工具固有局限，记 `limitation` 即可 |
 | share2sink 依赖 ref2share | 直接跑报错 | **先跑 `ref2share`**，再用 `--ref2share_result` 指过去 |
 | 挂载失败 | `docker: invalid mount config` | 确认宿主路径存在、Docker 有权访问该目录；Linux 下无需路径翻译 |
 | 解包的符号链接 | rootfs 复制失败 | 复用 `fsa/utils/traverse.py` 符号链接容错，别自己 `cp -r` |
 
 ---
 
-## 反哺主轨（加分项，A1/A2）
+## 反哺主轨（进阶项 A1/A2）
 
 - **A1**：把 `Clustering_result_v2.result` 的「前端关键字 ↔ 后端二进制」映射写回
   `tools/web/handler_extract.py`，补上「哪个参数由哪个 handler 处理」这环。

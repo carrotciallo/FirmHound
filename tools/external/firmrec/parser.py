@@ -10,7 +10,7 @@ normalize:
     detailed match rows (binary / addr / signature similarity / matched CVE).
   * ``poc_info/`` -- PoC payloads. **Every PoC MUST pass the sanitizer
     (``tools.external.firmrec.sanitize``) before the finding is persisted**;
-    an unsafe PoC drops the finding (F-FirmRec.md §7.4).
+    an unsafe PoC drops the finding (firmrec.md §7.4).
 
 Parsing strategy (mirrors the SaTC parser): every reader is tolerant and never
 raises. A malformed line / file degrades to fewer findings and a ``limitation``,
@@ -250,7 +250,7 @@ def _loads_json(path: Path) -> dict[str, Any]:
 
 
 def compute_confidence(similarity: str | float | None = None, *, has_entry: bool = False) -> float:
-    """Explainable confidence score (F-FirmRec.md §7.3).
+    """Explainable confidence score (firmrec.md §7.3).
 
     If FirmRec reports a signature similarity, use it directly (capped 0..1).
     Otherwise fall back to ``0.5 + 0.3*similarity + 0.2*(has_entry evidence)``,

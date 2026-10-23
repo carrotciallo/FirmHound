@@ -1,9 +1,9 @@
-"""Unit tests for the KLEE harness generator (X1, G-KLEE.md §4.2 / §7.1).
+"""Unit tests for the KLEE harness generator (X1, klee.md §4.2 / §7.1).
 
 Covers HarnessSpec -> C generation for command-injection / overflow, buffer-size
 handling, missing-data defaults, and candidate extraction. The *real KLEE* run
 (the ``@pytest.mark.slow`` compile test) is skipped unless clang and KLEE headers are present
-(G-KLEE.md §7.2 CI constraint).
+(klee.md §7.2 CI constraint).
 """
 
 from __future__ import annotations

@@ -1,11 +1,11 @@
 # FirmRec 复发专项实验（benchmarks/external/firmrec/comparison.md）
 
-> F-FirmRec.md §6（F6）。核心实验：**用 A 固件 / A 组漏洞的签名 → 检测 B 固件中的变体**。
-> 这是 FirmRec 真正的价值证明，也是答辩最高频被问的一招。
+> firmrec.md §6（F6）。核心实验：**用 A 固件 / A 组漏洞的签名 → 检测 B 固件中的变体**。
+> 这是 FirmRec 的主要价值证明，也是评审时最常被追问的一点。
 
 ## 实验设计
 
-- **签名来源（known）**：我们的 9-CVE 知识库（`vuln_info_source: our`）或官方样例
+- **签名来源（known）**：自建的 9-CVE 知识库（`vuln_info_source: our`）或官方样例
   （`official`），分别跑一遍做对照。
 - **检测目标**：L2 DIR-859 + L3 两个真实固件（Tenda AC15 / Netgear R7000 类）。
 - **度量**：
@@ -31,7 +31,7 @@
 ## 运行方式
 
 ```bash
-# 用我们的 9-CVE 签名对 L2 跑复发检测
+# 用自建的 9-CVE 签名对 L2 跑复发检测
 python scripts/run_external.py --tool firmrec --run-dir runs/<firmrec-L2-our>
 
 # 产物：recurrence_findings.json（含 matched_cve + 相似度）

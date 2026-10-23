@@ -1,4 +1,4 @@
-"""KLEE pruning + false-positive guard (X2 -- G-KLEE.md §4.3).
+"""KLEE pruning + false-positive guard (X2 -- klee.md §4.3).
 
 KLEE's ``infeasible`` verdict only means "under *my harness model* this path
 cannot be reached" -- not "the real firmware is safe". A simplified stub may have
@@ -25,7 +25,7 @@ from typing import Any
 from fsa.utils.jsonio import save_json
 from tools.external.base import normalize_addr
 
-# Single source of truth for the audit threshold (G-KLEE.md §8.2).
+# Single source of truth for the audit threshold (klee.md §8.2).
 AUDIT_PRUNE_RATE_THRESHOLD = 0.70
 AUDIT_SAMPLE_SIZE = 5
 

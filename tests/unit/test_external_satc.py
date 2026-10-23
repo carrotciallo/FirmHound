@@ -1,7 +1,7 @@
 """Unit tests for the SaTC parser across its six required branches.
 
 These tests NEVER invoke the real SaTC binary or Docker. They only parse the
-committed fixtures under ``tools/external/satc/fixtures/`` (see E-SaTC.md F4).
+committed fixtures under ``tools/external/satc/fixtures/`` (see satc.md F4).
 """
 
 from __future__ import annotations

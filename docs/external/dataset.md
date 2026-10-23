@@ -13,7 +13,7 @@
 - **用途**：SaTC/KLEE/BOND 的全链路冒烟；KLEE 需要 C 源码走 wllvm 生成 LLVM bitcode
 - **状态**：✅ 脚本存在，可本地生成
 
-## L2 — DIR-859 真实固件（现场即有）
+## L2 — DIR-859 真实固件（本地常备）
 
 | 项 | 值 |
 |---|---|
@@ -22,7 +22,7 @@
 | 大小 | 9,289,876 字节（~8.86 MiB） |
 | 架构 | MIPS（大端，Broadcom 系） |
 | 已解包 | `tmp/unpacked/_DIR859_FW102b03.bin.extracted/squashfs-root` |
-| 已知漏洞 | `formexeCommand` 命令注入（`CVE-2019-17621` 同类，现场复现用，非答案库） |
+| 已知漏洞 | `formexeCommand` 命令注入（`CVE-2019-17621` 同类，复现验证用，非答案库） |
 | 状态 | ✅ 已就位，可直接喂 SaTC |
 
 ## L3 — 两个真实固件（四项共用，统一输入）

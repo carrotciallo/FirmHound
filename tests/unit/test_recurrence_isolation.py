@@ -1,4 +1,4 @@
-"""FirmRec recurrence isolation tests (F-FirmRec.md §4.4 -- the academic-integrity gate).
+"""FirmRec recurrence isolation tests (firmrec.md §4.4 -- the academic-integrity gate).
 
 These are the *unique* deliverable of student F: FirmRec requires known-vulnerability
 signatures, so it must never participate in a blind benchmark run. Three guarantees:

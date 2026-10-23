@@ -1,7 +1,7 @@
-# FirmRec `vuln_info` 映射表（我们 9-CVE 知识库 → FirmRec 签名格式）
+# FirmRec `vuln_info` 映射表（自建 9-CVE 知识库 → FirmRec 签名格式）
 
-> F-FirmRec.md §5.2（X2）。我们的 9 个 CVE 来自 `benchmarks/CVEs/<CVE>/`，用于方法论沉淀与
-> 回归验证，**不是比赛现场的答案库**。下面是把它们转成 FirmRec `vuln_info` 的映射，并**明确
+> firmrec.md §5.2（X2）。自建的 9 个 CVE 来自 `benchmarks/CVEs/<CVE>/`，用于方法论沉淀与
+> 回归验证用，**不作为待测目标的答案库**。下面是把它们转成 FirmRec `vuln_info` 的映射，并**明确
 > 标注哪些是推定的**——推定不等于事实（学术诚信）。
 
 生成脚本：`tools/external/firmrec/vuln_info.py::collect_our_vuln_info`，落盘
@@ -18,7 +18,7 @@
 | `source.name/type` | candidate.source | 事实 | 攻击入口参数 |
 | `entry.function` | candidate.entry.function | 事实 | 处理入口函数 |
 | `entry.addr` | candidate.entry.addr | **推定** | fixture 全部为 `0x00405000`，属占位，非真实地址 |
-| `binary_id` | candidate.binary_id | **推定** | `bin-CVE-xxxx` 是抽象 id，**不是真实 rootfs 路径**，须现场映射 |
+| `binary_id` | candidate.binary_id | **推定** | `bin-CVE-xxxx` 是抽象 id，**需按实际样本映射到 rootfs 路径** |
 | `call_chain` | candidate.call_chain | 事实 | 函数级调用链 |
 | `verdict` | verdict.json.verdicts[0].action | 事实 | ACCEPT / NEED_DYNAMIC |
 | `references` | candidate.metadata.references | 事实 | 公开披露链接 |
@@ -46,6 +46,6 @@
 ## 与官方 `vuln_info` 的差异
 
 官方 FirmRec 样例的 `vuln_info` schema 以其仓库 `inout/` 为准（先跑通官方样例再照抄格式）。
-本仓库 `vuln_info_dataset.json` 是我们的最佳努力映射，字段名已对齐 FirmRec 常见结构
+本仓库 `vuln_info_dataset.json` 是本仓库的最佳努力映射，字段名已对齐 FirmRec 常见结构
 （cve_id / device / vuln_class / entry / source / sink / call_chain / verdict / references）。
-若官方样例 schema 有出入，以官方为准，本文件仅作「用我们自己的漏洞知识库做复发检测」的对照。
+若官方样例 schema 有出入，以官方为准，本文件仅作「用自建漏洞知识库做复发检测」的对照。

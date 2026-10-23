@@ -8,7 +8,7 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 
 > 角色：作为 F（外部分析组）的实战手册。把 FirmRec（CCS'24, seclab-fudan/FirmRec）
 > 接入 FirmHound 流水线，产出标准化的 `external_finding`。
-> 本 Skill 是「方法论 + 排错表」，不是 CVE 答案库——靠通用解析，不靠硬编码。
+> 本 Skill 提供方法论与排错表，靠通用解析定位，不依赖 CVE 特征库。
 
 ## 1. 目标
 
@@ -17,13 +17,13 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 完全没有的能力：**利用「这个洞在别处出现过」这条信息去扫变体**。
 
 **关键定位（特殊性）**：FirmRec **不进主链**。它要求已知漏洞签名，与系统「零 CVE
-先验、不泄露 Ground Truth」的核心卖点直接冲突。因此它是全组**唯一需要防污染**
-的工具——隔离机制（§隔离）是它的第一交付物，比跑通更重要。比赛现场最可能的
+先验、不泄露 Ground Truth」的核心前提直接冲突。因此它是全组**唯一需要防污染**
+的工具——隔离机制（§隔离）是它的第一交付物，比跑通更重要。实际运行中最可能的
 快速成果一招：**给了 CVE 之后，扫同厂商跨型号变体**。
 
 ## 2. 适用场景 / 输入
 
-- **输入**：固件镜像（FirmRec 吃 `inout/firmware/images/`，我们 `UNPACK` 产物是解包
+- **输入**：固件镜像（FirmRec 吃 `inout/firmware/images/`，本项目 `UNPACK` 产物是解包
   rootfs，prepare 阶段把 rootfs 当 firmware 输入兜底）+ `inout/vuln_info/`（已知漏洞
   签名）+ `inout/experiment.json`（任务表）。
 - **触发**：`EXTERNAL_ANALYSIS` 阶段，且 `config/dev.yaml` 中
@@ -44,7 +44,7 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 1. **probe()**：检查 Docker daemon + `xylearn/firmrec-base` 镜像。**永不抛异常**；
    缺失返回 `available=False + missing=[...]` → 整条链路 `skipped`。
 2. **prepare()**：在 `tmp/external/firmrec/<run_id>/` 建 `out/`、`logs/`、`inout/`
-   （firmware / vuln_info / experiment.json）。`vuln_info` 默认来自我们的 9-CVE 知识库
+   （firmware / vuln_info / experiment.json）。`vuln_info` 默认来自自建的 9-CVE 知识库
    （`vuln_info_source: our`），官方样例走 `official`（占位，跑通官方样例后填真实 schema）。
 3. **run()**：容器内跑 `python -m firmrec.pipeline all`。PostgreSQL 须先经 `make start`
    起来（FirmRec 的依赖），否则记 `limitation` 说明 PG 未就绪——不伪造成功。
@@ -73,14 +73,14 @@ external:
   firmrec:
     enabled: false
     image: xylearn/firmrec-base
-    signature_db: ./benchmarks/CVEs     # 我们的 9-CVE 知识库
+    signature_db: ./benchmarks/CVEs     # 自建的 9-CVE 知识库
     vuln_info_source: our               # our | official
     mode: signature_only                # 盲跑禁止
     sanitize_poc: true                  # 硬门：PoC 必须过脱敏才许落盘
     timeout_s: 7200
 ```
 
-**现场策略**：不要在 Blind Benchmark 开 FirmRec。只在「比赛现场给了 CVE，扫同厂商
+**运行策略**：不要在 Blind Benchmark 开 FirmRec。只在「已经掌握某个 CVE，扫同厂商
 变体」的明确场景开启，且其结论单列、不计入零先验指标。
 
 ## 6. 验收与降级（F7 八档不 abort）
@@ -105,7 +105,7 @@ external:
 
 ## 隔离说明（X1，F 的独有交付，学术诚信闸门）
 
-四道隔离**全部实现**，缺一不可（F-FirmRec.md §4.2）：
+四道隔离**全部实现**，缺一不可（firmrec.md §4.2）：
 
 1. **默认关闭**：`config/dev.yaml` 的 `firmrec.enabled: false`。
 2. **盲跑强制禁用（代码断言）**：`tools/external/adapter._resolve_external_config`
@@ -125,7 +125,7 @@ external:
 | PostgreSQL 起不来 | `make start` 后 `psql` 连不上 | 进容器手动 `service postgresql start`；查 `dataflow.conf` 与连接串 |
 | `make build` 后改动不生效 | 改了源码/config 容器里还是旧的 | 必须重跑 `make build` 把源码拷进新镜像 |
 | 没有 LLM key 跑不完整 | pipeline 走到入口搜索就停 | 配 `config.yaml` 的 `llm_key/url/model`（用国内备案端点）；不配也要跑，记录退化 |
-| `vuln_info` 格式不对 | pipeline 报找不到字段 | 先跑通官方样例，再照抄格式填我们的 9 CVE |
+| `vuln_info` 格式不对 | pipeline 报找不到字段 | 先跑通官方样例，再照抄格式填自建的 9 CVE |
 | benchmark fixture 是抽象的 | `binary_id = bin-CVE-xxxx` 非真实路径 | 做映射表，明写推定字段（`vuln_info_mapping.md`） |
 | 容器内 curl 被拉黑 | 调模型失败 | 宿主机侧 Python 预取后写进 `inout/`，避开容器内网络调用 |
 | 合成固件是 x86 | FirmRec 主打 MIPS/ARM | 记录是否支持；不支持则 L1 不作为验收必需项（comparison 注明） |
@@ -134,7 +134,7 @@ external:
 
 ---
 
-## 反哺主轨（加分项）
+## 反哺主轨（进阶项）
 
 - **A**：把 FirmRec 检出的「已知变体特征」（函数名 + 调用模式）沉淀进
   `source_sink_rules` 的厂商封装函数字典，作为非 CVE 先验的通用模式（不写死 CVE）。

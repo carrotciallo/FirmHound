@@ -6,7 +6,7 @@ bitcode, so it is architecture-agnostic (no qemu, no real device) -- which is wh
 it sits in the ``SYMEX_PRUNE`` stage, pruning infeasible candidates *before* the
 expensive BOND fuzzing.
 
-Three bitcode strategies (G-KLEE.md §4.1), selected per candidate:
+Three bitcode strategies (klee.md §4.1), selected per candidate:
   * S1 source  -- candidate carries a real source file (synthetic firmware C);
                   compile the whole program with ``wllvm`` + ``extract-bc``.
   * S2 harness -- DEFAULT. We synthesise a C harness from the sink signature with
@@ -46,7 +46,7 @@ from tools.external.klee.harness_gen import (
 )
 from tools.external.klee.parser import parse_klee_output
 
-# Default Docker image bundling LLVM 16 + Z3 + KLEE 3.2 (G-KLEE.md §3).
+# Default Docker image bundling LLVM 16 + Z3 + KLEE 3.2 (klee.md §3).
 IMAGE = "kleever/klee:llvm-16"
 
 
