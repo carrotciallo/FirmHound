@@ -1,6 +1,6 @@
 # BOND raw 真实运行落盘区
 
-待 **8/31 机器 job** 真实运行后，将下列产物落盘到本目录：
+在具备 Docker 与仿真环境的目标机跑完后，将下列产物落盘到本目录：
 
 - `run-<fw>-<ts>/Bond_result/` — action_find（入口点）+ custom_analysis（约束）
 - `run-<fw>-<ts>/fuzz_log/fuzz_sent_log.txt` — 发送记录 + TRIGGERED/crash/timeout 标记

@@ -1,16 +1,15 @@
 # 外部分析器集成与降级说明
 
-> 本目录四份细则 + 两份支撑文档：
+> 本目录三份文档：
 >
 > | 文档 | 内容 |
 > |---|---|
 > | **README.md（本文件）** | 编排顺序、开关、能力边界、诚实降级、安全红线 |
-> | [`satc.md`](satc.md) | 共享关键字污点分析（USENIX Sec'21） |
-> | [`firmrec.md`](firmrec.md) | 复发漏洞检测（CCS'24），Blind Run 强制隔离 |
-> | [`klee.md`](klee.md) | 符号执行路径可行性剪枝（v3.2） |
-> | [`bond.md`](bond.md) | 约束导向 fuzz（mini-BOND）+ PoC 脱敏闸门 |
 > | [`dataset.md`](dataset.md) | L1/L2/L3 样本清单、来源、SHA256、架构 |
 > | [`field-testing.md`](field-testing.md) | 真机环境准备与四器逐个跑通 |
+>
+> 四个工具各自的方法论、命令、配置与踩坑在技能卡里：
+> `skills/08-external-analyzers/{satc,firmrec,klee,bond}/SKILL.md`。
 
 ## 1. 目标与边界
 

@@ -3,7 +3,8 @@
 FirmRec (CCS'24, seclab-fudan/FirmRec) consumes a *firmware image* plus a
 *vuln_info* signature DB and emits recurring-vulnerability detections. It is the
 only external tool that **requires known-vulnerability signatures**, so this
-analyzer is gated by two independent switches (see docs/external/firmrec.md §4):
+analyzer is gated by two independent switches
+(see skills/08-external-analyzers/firmrec/SKILL.md):
 
   1. ``external.firmrec.enabled`` must be true (off by default).
   2. It is force-disabled on any *blind* run by ``tools/external/adapter`` via

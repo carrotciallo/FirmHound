@@ -1,8 +1,8 @@
 # 外部分析器数据集（docs/external/dataset.md）
 
-> 三档数据集（L1/L2/L3）是 E 同学 SaTC 复现与后续 KLEE/BOND/FirmRec 复用的共同输入。
-> **下载/生成任何固件后，必须在此登记：来源 URL、SHA256、大小、架构。** 这是 F1 与
-> benchmark 可复现性的地基。
+> 三档数据集（L1/L2/L3）是 SaTC、KLEE、BOND、FirmRec 复用的共同输入。
+> **下载/生成任何固件后，必须在此登记：来源 URL、SHA256、大小、架构。** 这是 benchmark
+> 可复现性的地基。
 
 ## L1 — 合成固件（自带 C 源码，KLEE wllvm 路径必需）
 
@@ -34,9 +34,9 @@
 
 > 解包后内部镜像：
 > - L3-b：`firmware_samples/R7000-V1.0.11.100_10.2.100.chk`（CHK 包装 → TRX@58 → LZMA 内核@86 → SquashFS@2221558，xz，little-endian）。已 `binwalk -e` 解包 → `tmp/unpacked/_R7000-V1.0.11.100_10.2.100.chk.extracted/squashfs-root`（1572 文件，ARM 小端；`bin/busybox` ELF = 32-bit LE ARM）。
-> - L3-a 解包后为 `US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin`（待 8/31 机器下载后解包）。
+> - L3-a 解包后为 `US_AC15V1.0BR_V15.03.05.19_multi_TD01.bin`（待有公网的目标机下载后解包）。
 
-### 如何下载（在 8/31 机器上跑，需真实公网 egress）
+### 如何下载（需公网 egress，在能访问厂商站点的机器上跑）
 
 下载脚本已升级为**一键入口** `scripts/download_l3_firmware.py`（纯标准库、跨平台、幂等可重复跑），一条命令串起三件事：
 **下载 → (binwalk 解包 + 从 ELF 自动识别架构) → 回填本表**。
@@ -46,7 +46,7 @@
 - 回填：按行首 `| L3-a |` / `| L3-b |` 定位本表对应行，只改 SHA256 / 大小 / 架构 / 状态 单元格，不动型号/URL。
 
 ```bash
-# 在 8/31 机器（有正常公网访问）执行 —— 一条命令完成下载+解包+回填
+# 在能访问厂商站点的机器上执行 —— 一条命令完成下载+解包+回填
 cd <项目根>
 python scripts/download_l3_firmware.py            # 下载全部 L3 固件 + binwalk 解包 + 架构识别 + 回填 dataset.md
 python scripts/download_l3_firmware.py --check    # 仅测连通性，不下载
@@ -72,7 +72,7 @@ unzip -o firmware_samples/R7000_V1.0.11.100_10.2.100.zip -d firmware_samples/
 python3 -m binwalk -e -C tmp/unpacked firmware_samples/<image>
 ```
 
-> **沙箱出站说明**：开发沙箱允许通用 HTTPS（如 `example.com` → 200），但**拦截了 `down.tenda.com.cn`**（TLS 握手被重置，curl 连接超时），故 **Tenda AC15 必须依赖 8/31 真机 / 有公网机器** 才能下载；`downloads.netgear.com` 在本沙箱用 Python `urllib` 可正常拉取（curl 因 TLS 被代理拦截而失败），故 R7000 已先行下载并解包到位。
+> **沙箱出站说明**：开发沙箱允许通用 HTTPS（如 `example.com` → 200），但**拦截了 `down.tenda.com.cn`**（TLS 握手被重置，curl 连接超时），故 **Tenda AC15 需在有公网的机器上** 下载；`downloads.netgear.com` 在本沙箱用 Python `urllib` 可正常拉取（curl 因 TLS 被代理拦截而失败），故 R7000 已先行下载并解包到位。
 
 ## 共享约定
 

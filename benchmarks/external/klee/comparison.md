@@ -1,6 +1,6 @@
 # KLEE 剪枝实验 · comparison.md
 
-> 实验设计（klee.md §8）：对 `finding_fusion` 产出的 unified candidates 的 Top-10，逐个生成
+> 实验设计：对 `finding_fusion` 产出的 unified candidates 的 Top-10，逐个生成
 > harness → `klee --max-time=300s`，统计**剪枝率**与**人工抽检**。
 
 ## 指标
@@ -9,7 +9,7 @@
 - **平均单候选耗时**、**路径爆炸 / 超时占比**、**触发 `ptr.err` 数量**（意外收获：直接证明内存错误）。
 - **抽检**：剪枝率 > 70% 时，从被剪候选随机抽 5 条人工复核（确认无路可走、harness 建模合理）。
 
-## 表格骨架（待 8/31 真实符号执行填写）
+## 表格骨架（待真实符号执行结果填写）
 
 | 固件 | 送检 | infeasible | 可达+witness | 超时 | 路径爆炸 | ptr.err | 剪枝率 | 抽检结果 | 平均耗时 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -27,4 +27,4 @@
 ## 状态
 
 - 代码与 harness 生成器已落地并通过单测（见 `tests/unit/test_external_klee*.py`）。
-- 真实数字待 8/31 机器任务补齐（本机无 KLEE、Docker 文件共享损坏）。
+- 真实数字需在装有 KLEE 的目标机补齐（开发机未安装 KLEE）。

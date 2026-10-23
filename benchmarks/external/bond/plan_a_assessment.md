@@ -1,6 +1,6 @@
 # Plan A（上游 BOND 真机）可行性评估
 
-> 计划 `bond.md` 要求评估"是否直接用上游 BOND 打真机"，并给出结论。结论：**放弃 Plan A，走 Plan B（mini-BOND）**。
+> 评估「是否直接用上游 BOND 打真机」的结论：**放弃 Plan A，走 Plan B（mini-BOND）**。
 
 ## 1. Plan A 的硬性障碍
 
@@ -11,7 +11,7 @@
 
 ## 2. Plan B（mini-BOND）为何更优
 
-- **全开源栈**：Ghidra headless + 自研 constraint/scheduler + LLM 模板 + QEMU/FirmAE 仿真，可评审、可复现、可分发。
+- **全开源栈**：Ghidra headless + 自研 constraint/scheduler + LLM 模板 + QEMU/FirmAE 仿真，可复核、可复现、可分发。
 - **安全约束**：四道硬闸 + 统一 PoC 脱敏，验证过程不造成实际影响。
 - **能力等价**：入口识别→约束抽取→模板→调度的链路完整，只是依赖从闭源换成开源。
 - **主要差异**：相比"调上游黑盒"，mini-BOND 展示的是**自主可控的验证能力**，更适合作为工程交付物展示。

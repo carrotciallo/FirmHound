@@ -26,7 +26,7 @@
 - Ghidra `analyzeHeadless` 不可用。
 - mini-BOND 的仿真生产模式未配置，simulation 被明确排除为生产 finding。
 
-因此材料中建议写：
+因此文档中建议写：
 
 > 四个外部工具已完成统一适配、解析、融合和降级接入；真实工具复现需要在具备 Docker/Ghidra/KLEE/仿真目标的 Linux 环境中开启。
 
@@ -133,7 +133,7 @@ python scripts/dev.py test
 
 - 配置授权仿真目标、私有 IP、baseline。
 
-## 5. 材料表述建议
+## 5. 文档表述建议
 
 建议突出：
 

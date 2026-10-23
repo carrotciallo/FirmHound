@@ -1,7 +1,7 @@
 # FirmRec 复发专项实验（benchmarks/external/firmrec/comparison.md）
 
-> firmrec.md §6（F6）。核心实验：**用 A 固件 / A 组漏洞的签名 → 检测 B 固件中的变体**。
-> 这是 FirmRec 的主要价值证明，也是评审时最常被追问的一点。
+> 核心实验：**用 A 固件 / A 组漏洞的签名 → 检测 B 固件中的变体**。
+> 这是 FirmRec 的主要价值证明，也是最常被追问的一点。
 
 ## 实验设计
 

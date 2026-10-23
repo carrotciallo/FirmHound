@@ -1,7 +1,6 @@
 # FirmRec 复现基准（benchmarks/external/firmrec）
 
-> F 同学（外部分析组）的复现记录。本目录沉淀 **版本 / 镜像 tag / 耗时基线 / 复发专项结论**，
-> 供后续 KLEE(B)、BOND(H) 复用时对照。
+> 本目录沉淀 **版本 / 镜像 tag / 耗时基线 / 复发专项结论**，供 KLEE、BOND 复用时对照。
 
 ## 工具版本（固定，复现必须锁定）
 
@@ -29,7 +28,7 @@
 - L3：两个真实固件（Tenda AC15 / Netgear R7000 类），**待下载后补 SHA256**
 - `vuln_info`：自建的 9-CVE 知识库已整理为 `tools/external/firmrec/vuln_info_dataset.json`
 
-## 耗时 / 内存 / 产物基线（F9）
+## 耗时 / 内存 / 产物基线
 
 | 固件 | vuln_info 源 | 耗时(s) | PG 库体积 | 产物体积 | 备注 |
 |---|---|---|---|---|---|
@@ -43,7 +42,7 @@
 > `VULNS.md` + `pg_*.csv` + `poc_info/` 落盘到 `tools/external/firmrec/fixtures/raw/`，
 > 用 `scripts/run_external.py --tool firmrec --run-dir <run>` 导出 `firmrec.json`。
 
-## 隔离状态（X1，强制）
+## 隔离状态（强制）
 
 - ✅ 默认关闭；✅ 盲跑代码强制禁用（`FORCED_DISABLE`）；✅ 产物分流
   `recurrence_findings.json`，主链 `fused.json` 不含 FirmRec 条目；✅ 报告单列标注。

@@ -1,7 +1,7 @@
 # FirmRec raw artifact dumps (real runs)
 
 This directory holds the real FirmRec products after a successful run on the
-student machine (8/31 full-reproduction day):
+a machine with Docker and network access:
 
   * `VULNS.md`            -- the detection report per firmware
   * `pg_*.csv`            -- PostgreSQL table dumps exported via

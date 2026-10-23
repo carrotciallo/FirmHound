@@ -2,7 +2,7 @@
 
 > 适用：在**有公网 egress + 足够资源**的真实机器上跑通四个外部分析器（今天新增的四个插件）。
 > 本文所有命令、配置键、产物路径均与代码实装一致（`config/dev.yaml`、`scripts/run_external.py`、`tools/external/*`）。
-> 背景：开发沙箱里四个工具代码层全部就绪（单元测试 298 通过、1 跳过），但真实运行被本机环境阻断（Docker 文件共享坏 / Ghidra 需 ≥16G / `down.tenda.com.cn` 被拦截），本指南就是把 8/31 机器 job 落成可执行步骤。
+> 背景：开发沙箱里四个工具代码层全部就绪（单元测试 339 通过、1 跳过），但真实运行被本机环境阻断（Docker 文件共享坏 / Ghidra 需 ≥16G / `down.tenda.com.cn` 被拦截），本指南就是把这批运行落成可执行步骤。
 
 ---
 
@@ -258,11 +258,11 @@ python -m fsa.orchestrator.cli run --task-card <task_card.json>        # 或等�
 | KLEE | F1/F2 符号执行 / F6 剪枝+抽检 / F9 性能 | `symex.reachable`、`.ktest`、剪枝率统计 | 剪枝率>70% 触发 5 条抽检；ptr.err→overflow 强证据；无误删 |
 | BOND | H8 真实 fuzz | `validation.*`、脱敏 PoC、`benchmarks/external/bond/raw/` | authorized+私有网段+emulation 下成功触发 ≥1；unsafe 闸验证有效 |
 
-**跨工具回归**：四个工具各自跑完 + FUSION 全绿后，跑一次 `pytest tests/unit`（应 298 passed / 1 skipped），确认真实产物没有改变基准行为。
+**跨工具回归**：四个工具各自跑完 + FUSION 全绿后，跑一次 `make test`（应 339 passed / 1 skipped），确认真实产物没有改变基准行为。
 
 ---
 
-## 7. 建议执行顺序（8/31 机器半天内跑完）
+## 7. 建议执行顺序（半天内跑完）
 
 1. **10 分钟**：环境健康检查（2.2/2.3 + `--check`），pull 四个镜像（可并行）。
 2. **30 分钟**：下载 + 解包 Tenda AC15（第 3 节），确认 `squashfs-root`。

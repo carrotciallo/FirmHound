@@ -184,7 +184,7 @@ fsa explain hunt1 --candidate-id <候选ID> --format markdown
 
 ---
 
-## 7. 第六步：人工审计（第二队同学的核心工作）
+## 7. 第六步：人工审计
 
 CLI 负责"找可疑点"，**人工审计负责"确认真漏洞"**。对每个 HIGH 以上候选，按下面 10 问逐一排查（Skill 05 的方法论）：
 

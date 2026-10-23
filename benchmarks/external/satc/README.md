@@ -1,7 +1,6 @@
 # SaTC 复现基准（benchmarks/external/satc）
 
-> E 同学（外部分析组组长）的复现记录。本目录沉淀 **版本 / commit / 镜像 tag / 耗时基线**，
-> 供后续 KLEE(B)、BOND(H)、FirmRec(F) 复用时对照。
+> 本目录沉淀 **版本 / commit / 镜像 tag / 耗时基线**，供 KLEE、BOND、FirmRec 复用时对照。
 
 ## 工具版本（固定，复现必须锁定）
 
@@ -27,7 +26,7 @@
 - L2：`firmware_samples/DIR859_FW102b03.bin`（已解包 `tmp/unpacked/_DIR859_FW102b03.bin.extracted/squashfs-root`）
 - L3：两个真实固件（Tenda AC15 / Netgear R7000 类），**待下载后补 SHA256**
 
-## 耗时 / 内存 / 产物基线（F9）
+## 耗时 / 内存 / 产物基线
 
 | 固件 | 配置 | 耗时(s) | 内存峰值 | 产物体积 | 可并发数 | 备注 |
 |---|---|---|---|---|---|---|

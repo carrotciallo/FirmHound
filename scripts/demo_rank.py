@@ -46,8 +46,8 @@ def render_markdown(ranked: list[dict]) -> str:
         "",
         "对 9 个历史 CVE 复现候选执行 10 维评分（P-I-U-D-C-S-W-K-V-T，满分 30），按风险降序排列。",
         "",
-        "| Rank | CVE | 设备 | 队员 | 类型 | 分数 | 等级 |",
-        "|------|-----|------|------|------|------|------|",
+        "| Rank | CVE | 设备 | 复现人 | 类型 | 分数 | 等级 |",
+        "|------|-----|------|--------|------|------|------|",
     ]
     for i, candidate in enumerate(ranked, start=1):
         meta = _metadata(candidate)

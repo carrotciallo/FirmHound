@@ -1,6 +1,6 @@
 # FirmRec `vuln_info` 映射表（自建 9-CVE 知识库 → FirmRec 签名格式）
 
-> firmrec.md §5.2（X2）。自建的 9 个 CVE 来自 `benchmarks/CVEs/<CVE>/`，用于方法论沉淀与
+> 数据集说明。自建的 9 个 CVE 来自 `benchmarks/CVEs/<CVE>/`，用于方法论沉淀与
 > 回归验证用，**不作为待测目标的答案库**。下面是把它们转成 FirmRec `vuln_info` 的映射，并**明确
 > 标注哪些是推定的**——推定不等于事实（学术诚信）。
 

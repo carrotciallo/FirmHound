@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-336%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-339%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -64,7 +64,7 @@
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 22 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，336 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，339 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -407,7 +407,8 @@ export OPENAI_API_KEY=sk-xxx
 .
 ├── fsa/                    # 核心包：orchestrator / runtime / safety / schemas / reporting / prompts / utils
 ├── tools/                  # 确定性工具：firmware(解包) / filesystem / web(攻击面) / binary / analysis / emulation
-├── skills/                 # Skill 知识库（00-08，含四个外部分析器子 Skill）
+├── skills/                 # Skill 知识库：00-08，父级给模型，子级给具体漏洞类/工具
+├── legacy/                 # 早期单文件 Skill 与打包产物（历史存档，不参与运行）
 ├── schemas/                # JSON Schema + examples（含 external_finding）
 ├── config/                 # dev.yaml / models.yaml / safety.yaml
 ├── benchmarks/CVEs/        # 9 个历史 CVE 金标准 fixture
@@ -418,9 +419,9 @@ export OPENAI_API_KEY=sk-xxx
 ├── tests/                  # 单元 / 集成测试（CI 不依赖外部重型工具）
 └── docs/                   # 文档（索引见 docs/README.md）
     ├── guide/              #   部署与演示、挖洞教程、CLI 测试方案
-    ├── external/           #   外部分析器：总纲、数据集、真机测试、四工具细则
-    ├── design/             #   设计与交付文档纲目（01–09）
-    └── archive/            #   历史记录：分工总纲、回归记录、差距分析
+    ├── external/           #   外部分析器：总纲、数据集、真机测试
+    ├── design/             #   设计决策记录
+    └── archive/            #   历史运行记录：回归、检出效果、四器接入核验
 ```
 
 ## Skill 体系
@@ -431,11 +432,10 @@ export OPENAI_API_KEY=sk-xxx
 | 01-unpack | 固件解包 | binwalk 降级、魔数表、rootfs 评分 |
 | 02-attack-surface | 攻击面 | Web/UPnP/CGI 枚举、认证矩阵三层交叉 |
 | 03-binary-decompile | 二进制分析 | 架构识别、Ghidra 降级路径 |
-| 04-static-analysis | 静态审计 | 命令注入五步法、协议解析六步法 |
-| 04-audit | 专项审计 | command-injection / buffer-overflow 复现经验 |
+| 04-audit | 静态审计 | 数据流模型、七层模板、误报五规则；子技能 command-injection / buffer-overflow |
 | 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定 |
 | 06-dynamic-validation | 动态验证 | L0–L3 分层、qemu-user 三大坑、安全门 |
-| 07-report | 报告生成 | 21 节骨架、8 项合规扫描、脱敏 |
+| 07-report | 报告生成 | 22 节骨架、8 项合规扫描、脱敏 |
 | 08-external-analyzers | 双轨外部分析 | SaTC/FirmRec/KLEE/BOND、汇聚、降级与先验隔离 |
 
 ## 外部分析器双轨链
@@ -510,9 +510,9 @@ make lint      # ruff 全绿
 | 提交前跑一遍自测 | [`docs/guide/cli-testing.md`](docs/guide/cli-testing.md) |
 | 接入 SaTC / FirmRec / KLEE / BOND | [`docs/external/README.md`](docs/external/README.md)（编排、开关、降级边界） |
 | 准备外部工具的机器与固件 | [`docs/external/field-testing.md`](docs/external/field-testing.md) + [`dataset.md`](docs/external/dataset.md) |
-| 查某个工具的接入细节 | [`satc.md`](docs/external/satc.md) · [`firmrec.md`](docs/external/firmrec.md) · [`klee.md`](docs/external/klee.md) · [`bond.md`](docs/external/bond.md) |
-| 写设计与交付文档（设计/实现/测试/手册/报告） | [`docs/design/`](docs/design/)（01–09 编号纲目） |
-| 看历史决策与回归证据 | [`docs/archive/`](docs/archive/)（只读，不代表当前实现） |
+| 查某个工具的方法与踩坑 | `skills/08-external-analyzers/<tool>/SKILL.md`（satc / firmrec / klee / bond） |
+| 查某个设计为什么这么做 | [`docs/design/design-rationale.md`](docs/design/design-rationale.md) |
+| 看历史运行记录 | [`docs/archive/`](docs/archive/)（只读，不代表当前实现） |
 
 ## 许可证
 

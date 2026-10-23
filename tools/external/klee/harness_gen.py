@@ -17,7 +17,7 @@ host (if clang is available) or inside the *backend* (docker) where KLEE's LLVM
 toolchain lives. The runner drives that second
 step; this module only produces + (best-effort) compiles the source.
 
-Three bitcode strategies (see docs/external/klee.md §4):
+Three bitcode strategies (see skills/08-external-analyzers/klee/SKILL.md):
   * S1 source  -- candidate carries a ``source_path`` (synthetic firmware C);
   * S2 harness -- we generate the stub ourselves (the default, always available);
   * S3 binary  -- lift the ELF with mcsema/retDec (allowed to fail; honest attribution).
