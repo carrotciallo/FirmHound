@@ -32,7 +32,7 @@ tags: [external, orchestration, satc, firmrec, klee, bond, fusion]
 3. `SYMEX_PRUNE` 运行 KLEE；不可达仅写 counterevidence，绝不自动删除候选。
 4. `RANK` 与 `VERIFY_TOP_K` 继续使用原十维 30 分制和 10 问/12 条规则。
 5. `CONSTRAINED_VALIDATION` 运行 mini-BOND；只有已脱敏的 marker/crash 证据可确认。
-6. `REPORT` 第 21 节展示交叉验证、限制与 FirmRec 的先验隔离声明。
+6. `REPORT` 的「外部分析器结果」一节展示交叉验证、限制与 FirmRec 的先验隔离声明。
 
 ## 安全约束
 

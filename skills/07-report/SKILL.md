@@ -10,7 +10,7 @@ tags: [report, verdict, compliance, m10, redaction]
 
 把整条流水线的产物（candidate / verdict / 证据 / 决策）汇集成**双产物**：
 
-- `report.md` — 人类可读，交付 / 评审用；
+- `report.md` — 人类可读，交付 / 复核用；
 - `final_verdict.json` — 机器可读，平台判分 / 自动化用。
 
 核心原则：**可解释、可审计、如实、脱敏**。看到 `system`/`strcpy` ≠ 漏洞，报告必须基于证据链，函数命中共现不构成结论；全部 REJECT 时如实输出「未发现强证据」，不强行报漏洞。
@@ -27,32 +27,33 @@ tags: [report, verdict, compliance, m10, redaction]
 
 ## 输出
 
-- `report.md`：固定 21 节章节
+- `report.md`：固定 22 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
 - `final_verdict.json`：`{run_id, firmware_sha256, findings:[...], stats:{...}}`
 
-## 报告 21 节固定骨架
+## 报告 22 节固定骨架
 
-1. 任务范围与授权边界
-2. 固件信息与哈希
-3. 解包结果
-4. 架构组件
-5. 攻击面
-6. 二进制分析
-7. 候选排行
-8. 主候选数据流（source → transform → sink → call_chain）
-9. 认证边界
-10. 输入校验
-11. 支持证据
-12. 反证
-13. 本地验证结果（M8，无则标注 `dynamic_skipped` 及原因）
-14. 结论置信度
-15. 限制 `remaining_limitations`
-16. 修复建议
-17. 运行指标
-18. 人工介入点
-19. 决策摘要
-20. 完整证据索引
-21. 外部工具交叉验证（SaTC/KLEE/BOND 主链；FirmRec 复发扫描独立标注）
+1. 执行摘要
+2. 任务与授权范围
+3. 输入与固件指纹
+4. 分析环境
+5. 解包与根文件系统
+6. 文件系统清单
+7. 体系结构与加固概览
+8. 启动服务
+9. Web 入口
+10. 网络与协议攻击面
+11. 重点二进制
+12. 静态分析方法
+13. 漏洞候选总览
+14. 风险排序
+15. 反证验证结果
+16. 误报控制摘要
+17. 本地动态验证
+18. 外部分析器结果
+19. 证据链与可追溯性
+20. 限制与待验证事实
+21. 修复建议
+22. 最终结论
 
 ## 执行流程
 
@@ -86,14 +87,14 @@ tags: [report, verdict, compliance, m10, redaction]
 | 场景 | 行为 |
 |---|---|
 | 合规扫描不过 | 报告生成失败，输出违规项清单 |
-| 无 candidate | 报告如实写「未发现候选」，21 节骨架仍齐全 |
-| M8 未运行 | 第 13 节标 `dynamic_skipped` + 原因 |
-| 证据索引缺失 | 第 20 节标「证据索引不完整」，不阻断报告 |
-| 外部工具缺失/超时 | 第 21 节写 `degraded` 与 limitation；主报告继续生成 |
+| 无 candidate | 报告如实写「未发现候选」，骨架仍齐全 |
+| M8 未运行 | 「本地动态验证」一节标 `dynamic_skipped` + 原因 |
+| 证据索引缺失 | 「证据链与可追溯性」一节标「证据索引不完整」，不阻断报告 |
+| 外部工具缺失/超时 | 「外部分析器结果」一节写 `degraded` 与 limitation；主报告继续生成 |
 | FirmRec 在 Blind Run 被请求 | 强制 `skipped/FORCED_DISABLE`，只报告隔离事实，不渲染已知 CVE 结果 |
 
 ## 验收标准
 
-- 对任一 run 生成报告：21 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
+- 对任一 run 生成报告：22 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
 - 报告中不出现任何可复现攻击参数（脱敏后）。
 - 全部 REJECT 场景如实输出「未发现强证据」。

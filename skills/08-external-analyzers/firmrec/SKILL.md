@@ -6,9 +6,9 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 
 # Skill 08 · 外部分析器：FirmRec
 
-> 角色：作为 F（外部分析组）的实战手册。把 FirmRec（CCS'24, seclab-fudan/FirmRec）
-> 接入 FirmHound 流水线，产出标准化的 `external_finding`。
-> 本 Skill 提供方法论与排错表，靠通用解析定位，不依赖 CVE 特征库。
+> 把 FirmRec（CCS'24, seclab-fudan/FirmRec）接入 FirmHound 流水线，
+> 产出标准化的 `external_finding`。本 Skill 提供方法论与排错表，
+> 靠通用解析定位，不依赖 CVE 特征库。
 
 ## 1. 目标
 
@@ -17,7 +17,7 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 完全没有的能力：**利用「这个洞在别处出现过」这条信息去扫变体**。
 
 **关键定位（特殊性）**：FirmRec **不进主链**。它要求已知漏洞签名，与系统「零 CVE
-先验、不泄露 Ground Truth」的核心前提直接冲突。因此它是全组**唯一需要防污染**
+先验、不泄露 Ground Truth」的核心前提直接冲突。因此它是本项目**唯一需要防污染**
 的工具——隔离机制（§隔离）是它的第一交付物，比跑通更重要。实际运行中最可能的
 快速成果一招：**给了 CVE 之后，扫同厂商跨型号变体**。
 
@@ -83,7 +83,7 @@ external:
 **运行策略**：不要在 Blind Benchmark 开 FirmRec。只在「已经掌握某个 CVE，扫同厂商
 变体」的明确场景开启，且其结论单列、不计入零先验指标。
 
-## 6. 验收与降级（F7 八档不 abort）
+## 6. 验收与降级（八档不 abort）
 
 - FirmRec 缺失 / 未启用 → `probe()` / `_resolve_external_config` → `skipped` + 记
   limitation，主链照常出报告。
@@ -103,9 +103,9 @@ external:
 
 ---
 
-## 隔离说明（X1，F 的独有交付，学术诚信闸门）
+## 隔离说明（唯一防污染闸门）
 
-四道隔离**全部实现**，缺一不可（firmrec.md §4.2）：
+四道隔离**全部实现**，缺一不可：
 
 1. **默认关闭**：`config/dev.yaml` 的 `firmrec.enabled: false`。
 2. **盲跑强制禁用（代码断言）**：`tools/external/adapter._resolve_external_config`

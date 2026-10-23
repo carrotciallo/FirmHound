@@ -24,6 +24,16 @@ tags: [audit, buffer_overflow, cve, m5]
 - `candidates_buffer_overflow.json`：缓冲区溢出候选列表
 - 每条候选标明受影响的 buffer、长度来源、危险函数、是否可被用户控制长度
 
+## 常见越界模式：协议长度字段链
+
+TLV 与厂商自定义协议里最常见的越界链路：
+
+```text
+length 字段 → count 字段 → 写入循环 → 定长 buffer → 无上限检查
+```
+
+五项逐条核对，全中（5/5）判为极高危；缺项按命中数降级。典型样本是 CVE-2021-31802（NETGEAR R7000 HTTP 头缓冲区溢出）。
+
 ## 执行流程
 
 1. **入口定位**

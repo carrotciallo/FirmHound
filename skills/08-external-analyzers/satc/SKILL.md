@@ -6,9 +6,9 @@ tags: [external, satc, taint, ghidra, angr, m-external]
 
 # Skill 08 · 外部分析器：SaTC
 
-> 角色：作为 E（外部分析组组长）的实战手册。把 SaTC（USENIX Security 2021,
-> NSSL-SJTU/SaTC）接入 FirmHound 流水线，产出标准化的 `external_finding`。
-> 本 Skill 提供方法论与排错表，靠通用解析定位，不依赖 CVE 特征库。
+> 把 SaTC（USENIX Security 2021, NSSL-SJTU/SaTC）接入 FirmHound 流水线，
+> 产出标准化的 `external_finding`。本 Skill 提供方法论与排错表，
+> 靠通用解析定位，不依赖 CVE 特征库。
 
 ## 1. 目标
 
@@ -80,7 +80,7 @@ external:
 **短周期策略**（时间受限）：只跑 `ref2sink_cmdi` + Top-1 二进制、关 `--taint_check`，
 压到 20–30 分钟。全量 4 配置（带/不带 taint × 4 脚本 × 多二进制）是离线 benchmark 才跑。
 
-## 6. 验收与降级（F7 八档不 abort）
+## 6. 验收与降级（八档不 abort）
 
 - SaTC 缺失 → `probe()` 返回 `available=False` → `skipped` + 记 limitation，主链照常出报告。
 - 8 种开关组合（全关 / satc±taint / ±share2sink / 叠加 firmrec·klee·bond 等）
@@ -89,8 +89,8 @@ external:
 
 ## 7. 与其他阶段协作
 
-- **下游 G（KLEE）** 拿本产出 `call_trace` 做路径剪枝。
-- **下游 H（BOND）** 拿 `source/sink/call_trace` 当 fuzz 输入。
+- **下游 KLEE** 拿本产出的 `call_trace` 做路径剪枝。
+- **下游 BOND** 拿 `source/sink/call_trace` 当 fuzz 输入。
 - **FUSION** 阶段把本产出与主轨候选按 `(binary_id, sink.addr, vuln_class)` 去重，
   主轨未命中的标 `external_only`（这是 benchmark 最关键的指标）。
 - **FirmRec 隔离**：带 `matched_cve` 的 finding 标 `blind_isolated`，不计入 `external_only` 增量。

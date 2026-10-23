@@ -23,7 +23,8 @@ tags: [dynamic, qemu, local_validation, m7, m8]
 ## 输出
 
 - `validation.json`：每条候选的验证结果
-  - `result`: `pwned` / `crash` / `no_trigger` / `inconclusive`
+  - `result`: `triggered` / `crash` / `no_trigger` / `inconclusive`
+    （`triggered` 只表示无害标记被执行，不代表拿到 shell 或控制流劫持）
   - `method`: `qemu_user` / `qemu_system` / `docker` / `manual`
   - `evidence`: 截图、pcap、core、日志路径
   - `notes`: 失败原因或利用条件说明
@@ -51,11 +52,12 @@ tags: [dynamic, qemu, local_validation, m7, m8]
    - 监听端口确认服务就绪（`netstat -ln` 或轮询 HTTP 200）。
 
 4. **构造触发请求**
-   - **命令注入**：在对应 source 字段注入 payload，例如：
-     - UPnP SOAP：`NewStatusURL=http://x.com/$(id> /tmp/pwn)`
-     - HTTP param：`cmd=127.0.0.1;id`
-     - HTTP header：`User-Agent: $(/bin/busybox id)`
+   - **命令注入**：在对应 source 字段注入无害标记，例如：
+     - UPnP SOAP：`NewStatusURL=http://127.0.0.1/$(touch /tmp/lab_marker)`
+     - HTTP param：`cmd=127.0.0.1;touch /tmp/lab_marker`
+     - HTTP header：`User-Agent: $(/bin/busybox hostname)`
    - **缓冲区溢出**：发送超长 header/body，观察崩溃或异常返回。
+   - 只用上表这类标记；不构造 shell、不提权、不落地持久化、不外联。
 
 5. **监控与取证**
    - 检测进程是否崩溃（SIGSEGV/SIGABRT）、产生 core dump。
@@ -63,7 +65,7 @@ tags: [dynamic, qemu, local_validation, m7, m8]
    - 捕获 QEMU 输出、strace、tcpdump。
 
 6. **结果判定**
-   - `pwned`：成功执行非预期命令或稳定控制 PC/返回 shell。
+   - `triggered`：无害标记按预期出现，且能排除基线自带的同名文件或日志。
    - `crash`：服务崩溃，确认是候选 sink 触发（需排除无关崩溃）。
    - `no_trigger`：服务正常响应，无崩溃/无命令执行证据。
    - `inconclusive`：环境依赖未满足（如需要 WAN 侧、特定硬件、特定版本），保留 high-confidence-candidate。

@@ -1,6 +1,7 @@
 ---
-name: bond-external-analyzer
-description: Integrate or maintain FirmHound's BOND constraint-directed validator, including real Ghidra export, bounded emulator probes, four safety gates, and PoC sanitization.
+id: 08-external-analyzers-bond
+title: 外部分析器 · BOND 约束导向验证
+tags: [external, bond, fuzz, emulation, poc_sanitize, m-external]
 ---
 
 # BOND 外部分析器

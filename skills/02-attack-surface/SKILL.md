@@ -1,3 +1,9 @@
+---
+id: 02-attack-surface
+title: 攻击面枚举与认证矩阵
+tags: [attack_surface, web, upnp, cgi, socket, m3]
+---
+
 # Skill 02：攻击面枚举
 
 ## 目标

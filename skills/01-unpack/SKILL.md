@@ -1,3 +1,9 @@
+---
+id: 01-unpack
+title: 固件解包与基线提取
+tags: [unpack, firmware, rootfs, manifest, m2]
+---
+
 # Skill 01：固件解包与基线提取
 
 ## 目标
