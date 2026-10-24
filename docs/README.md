@@ -19,7 +19,8 @@ docs/
 
 | 我想… | 文档 | 说明 |
 |---|---|---|
-| 在任意 Linux 发行版上装好并演示 | [`guide/deployment.md`](guide/deployment.md) | 五类发行版的依赖矩阵 → sasquatch → venv → 7 个演示脚本 → 录屏顺序 |
+| 在任意 Linux 发行版上装好依赖 | [`guide/install.md`](guide/install.md) | 六类发行版的安装命令、包名差异、sasquatch 编译、排错表 |
+| 从零部署并录制演示 | [`guide/deployment.md`](guide/deployment.md) | 装好之后的部署流程 → venv → 7 个演示脚本 → 录屏顺序 |
 | 从固件挖到第一个漏洞 | [`guide/hunting-workflow.md`](guide/hunting-workflow.md) | 选目标 → 解包 → `fsa analyze` → 读报告 → 10 问人工审计 |
 | 交付前做一次完整自测 | [`guide/cli-testing.md`](guide/cli-testing.md) | doctor / plan / analyze / 降级 / 安全策略的验收标准 |
 | 理解外部分析器怎么编进流水线 | [`external/README.md`](external/README.md) | 固定编排顺序、开关、能力边界、诚实降级、安全红线 |

@@ -58,77 +58,22 @@ sudo apk update && sudo apk upgrade
 
 ## 3. 安装基础依赖
 
-### 3.1 一条命令装齐
+按发行版的安装命令、包名差异与排错表统一在 [`install.md`](install.md)，本节不再重复。
+
+装完后的自检：
 
 ```bash
-# Debian / Ubuntu
-sudo apt install -y git python3 python3-pip python3-venv python3-dev \
-  build-essential gcc g++ make file binutils curl wget unzip tree \
-  p7zip-full cpio squashfs-tools binwalk pipx
-
-# Fedora / RHEL 系
-sudo dnf install -y git python3 python3-devel gcc gcc-c++ make file binutils \
-  curl wget unzip tree p7zip p7zip-plugins cpio squashfs-tools binwalk pipx
-
-# Arch / Manjaro（binwalk 在 AUR）
-sudo pacman -S --needed --noconfirm git python base-devel file binutils curl wget \
-  unzip tree p7zip cpio squashfs-tools
-yay -S --needed --noconfirm binwalk
-
-# openSUSE Leap / Tumbleweed
-sudo zypper install -y git python3 python3-devel gcc gcc-c++ make file binutils \
-  curl wget unzip tree p7zip cpio squashfs python3-pip
-pipx install binwalk
-
-# Alpine（容器）
-sudo apk add git python3 py3-pip python3-dev gcc g++ make musl-dev file binutils \
-  curl wget unzip tree p7zip cpio squashfs-tools
-pipx install binwalk
+python3 --version      # 需要 3.11 或更高
+make doctor
 ```
 
-### 3.2 包名对照（易错项）
-
-| 能力 | Debian/Ubuntu | Fedora/RHEL | Arch | openSUSE | Alpine |
-|---|---|---|---|---|---|
-| SquashFS 工具 | `squashfs-tools` | `squashfs-tools` | `squashfs-tools` | `squashfs` | `squashfs-tools` |
-| 7z | `p7zip-full` | `p7zip` + `p7zip-plugins` | `p7zip` | `p7zip` | `p7zip` |
-| ELF 工具 | `binutils` | `binutils` | `binutils` | `binutils` | `binutils` |
-| C 工具链 | `build-essential` | `gcc gcc-c++ make` | `base-devel` | `gcc gcc-c++ make` | `build-base` |
-| Python 头文件 | `python3-dev` | `python3-devel` | 随 `python` | `python3-devel` | `python3-dev` |
-| venv | `python3-venv` | 内置 | 内置 | 内置 | `py3-pip` |
-| QEMU 用户态 | `qemu-user-static` | `qemu-user-static` | AUR `qemu-user-static` | `qemu-linux-user` | `qemu-arm` `qemu-mipsel` … |
-
-### 3.3 检查版本
-
-```bash
-python3 --version
-git --version
-binwalk --help | head
-unsquashfs -version
-```
-
-建议 Python 版本为 3.11 或更高（项目 `pyproject.toml` 的 `requires-python` 为准）。3.10 通常也能跑通，但不作为支持矩阵内的版本。
+`fsa doctor` 报 `status: ok`，或只有 `commands: degraded`（缺可选工具），就算就绪。
 
 ## 4. 安装 sasquatch
 
-很多路由器固件使用非标准 SquashFS，普通 `unsquashfs` 可能解不开，所以建议安装 `sasquatch`。
+`sasquatch` 的编译依赖、安装步骤与验证方法见 [`install.md`](install.md) 的 §3。
 
-```bash
-cd /tmp
-git clone --depth 1 https://github.com/onekey-sec/sasquatch.git
-cd sasquatch
-make
-sudo make install
-```
-
-验证：
-
-```bash
-which sasquatch
-sasquatch -version || sasquatch -h | head
-```
-
-如果 `git clone` 太慢，可以先跳过 sasquatch，但 Tenda AC15 这类固件可能无法完整解包。跑完整演示前先装好；Arch 可直接 `yay -S sasquatch`。
+不装也能跑纯 Python 的静态分析；Tenda AC15 这类厂商魔改固件会解包不完整。
 
 ## 5. 从 GitHub 下载项目
 

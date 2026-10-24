@@ -120,120 +120,20 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
 
 ## 环境配置（Linux）
 
-> 支持主流 Linux 发行版，glibc 与 musl 均可：Debian/Ubuntu、Fedora/RHEL/CentOS Stream/Rocky/Alma、Arch/Manjaro、openSUSE Leap/Tumbleweed、Alpine（容器）。
-> 静态分析层是纯 Python（pyelftools/capstone），不依赖系统包；解包与动态验证依赖下表的宿主工具，缺失只会让对应阶段降级，不会中断。
+支持 Debian/Ubuntu 系、Fedora/RHEL 系、Arch/Manjaro、openSUSE、Alpine，glibc 与 musl 都可以。
+静态分析层是纯 Python，Python 3.11+ 装好就能跑；解包与动态验证依赖宿主工具，缺了只让对应阶段降级，不中断主链。
 
-### 1. 依赖能力矩阵
+**按发行版安装 → [`docs/guide/install.md`](docs/guide/install.md)**
 
-| 依赖 | 用途 | 必需性 | Debian/Ubuntu | Fedora/RHEL 系 | Arch/Manjaro | openSUSE | Alpine |
-|---|---|---|---|---|---|---|---|
-| `binwalk` | 固件签名扫描与自动解包 | 必需 | `binwalk` | `binwalk` | AUR `binwalk` | `pipx install binwalk` | `pipx install binwalk` |
-| `unsquashfs` | 标准 SquashFS 解包 | 必需 | `squashfs-tools` | `squashfs-tools` | `squashfs-tools` | `squashfs` | `squashfs-tools` |
-| `sasquatch` | 非标准 SquashFS（多数路由固件） | 强烈建议 | 源码编译 | 源码编译 | AUR `sasquatch` | 源码编译 | 源码编译 |
-| `cpio` | initramfs、部分容器格式 | 必需 | `cpio` | `cpio` | `cpio` | `cpio` | `cpio` |
-| `7z` | ZIP / 7z / LZMA 容器 | 建议 | `p7zip-full` | `p7zip p7zip-plugins` | `p7zip` | `p7zip` | `p7zip` |
-| `file` | 文件类型识别 | 必需 | `file` | `file` | `file` | `file` | `file` |
-| `readelf` `strings` | ELF 头解析、字符串提取 | 必需 | `binutils` | `binutils` | `binutils` | `binutils` | `binutils` |
-| `qemu-<arch>-static` | 用户态动态验证 | 可选 | `qemu-user-static` | `qemu-user-static` | AUR `qemu-user-static` | `qemu-linux-user` | `qemu-arm` `qemu-mipsel` … |
-| `gcc` `make` | 编译 sasquatch / harness | 必需 | `build-essential` | `gcc make` | `base-devel` | `gcc make` | `build-base` |
-| `python3` + venv | 运行 CLI | 必需 | `python3 python3-venv python3-dev` | `python3 python3-devel` | `python` | `python3 python3-devel` | `python3 py3-pip` |
-
-### 2. 一条命令装齐（按发行版选一行）
+每个发行版的具体命令、包名差异、`sasquatch` 编译与排错表都在那一份文档里。
 
 ```bash
-# Debian / Ubuntu（含 Kali、Raspberry Pi OS）
-sudo apt update && sudo apt install -y \
-    binwalk squashfs-tools cpio p7zip-full file binutils \
-    build-essential qemu-user-static python3 python3-venv python3-dev git pipx
-
-# Fedora / RHEL / CentOS Stream / Rocky / AlmaLinux
-sudo dnf install -y binwalk squashfs-tools cpio p7zip p7zip-plugins file binutils \
-    gcc make qemu-user-static python3 python3-devel git pipx
-
-# Arch / Manjaro（binwalk 与 qemu-user-static 在 AUR）
-sudo pacman -S --needed squashfs-tools cpio p7zip file binutils base-devel python git
-yay -S --needed binwalk sasquatch qemu-user-static
-
-# openSUSE Leap / Tumbleweed
-sudo zypper install -y squashfs cpio p7zip file binutils gcc make qemu-linux-user \
-    python3 python3-devel git
-pipx install binwalk
-
-# Alpine（容器内）
-apk add squashfs-tools cpio p7zip file binutils build-base python3 py3-pip git \
-    qemu-arm qemu-aarch64 qemu-mipsel
-pipx install binwalk
+make setup     # 建 .venv + 装依赖 + editable 安装 + 跑一次自检
+make doctor    # 单独检查环境：路径、Schema、运行时、缺失工具
 ```
 
-> 包名以各发行版仓库实际为准；`dnf` 在 RHEL 8 上可能需先 `subscription-manager` 或启用 EPEL。
-> 容器内跑完整流程时建议用 `debian:12` / `ubuntu:24.04` 基础镜像，工具链最齐；Alpine 适合只要静态分析的轻量场景。
-
-### 3. 安装 sasquatch（非标准 SquashFS，强烈建议）
-
-```bash
-git clone --depth 1 https://github.com/onekey-sec/sasquatch.git /tmp/sasquatch
-cd /tmp/sasquatch && make && sudo make install
-```
-
-> 多数路由固件用非标准 SquashFS（`squashfs:little endian` 变体），`unsquashfs` 解不了，必须用 sasquatch。Arch 可直接从 AUR 装，免编译。
-
-### 4. 安装 Python 与项目依赖
-
-```bash
-cd <项目路径>
-make dev          # 创建 .venv + 装 requirements + pip install -e .
-```
-
-`make dev` 做三件事：`python3 -m venv .venv`、装 `requirements.txt`、以 editable 方式装本项目。
-之后所有目标都在 `.venv` 内执行，不污染系统 Python；换解释器用 `make dev PYTHON=python3.12`。
-
-手动等价写法：
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install -e .
-```
-
-Debian/Ubuntu 若报 `ensurepip is not available`，先装 `python3-venv`；Alpine 装 `python3 py3-pip` 即可（musl 下 `capstone` 有预编译 wheel，`pyelftools` 纯 Python）。
-
-只想装命令、不开发源码时，用 pipx 隔离安装：
-
-```bash
-pipx install .
-```
-
-### 5. 验证
-
-```bash
-make doctor                         # 路径、Schema、运行时、外部工具
-make test                           # 单元测试
-for t in binwalk unsquashfs sasquatch strings readelf 7z; do
-    printf '%-12s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
-done
-```
-
-`fsa doctor` 的输出里会带当前发行版信息（`platform.family` / `package_manager` / `libc`）；
-缺工具时按**当前发行版**给出安装提示（如 Fedora 上是 `dnf: squashfs-tools`，openSUSE 上是 `zypper: squashfs`），
-并且只报 degraded，静态分析照常可用。
-
-```bash
-fsa doctor --json-output | python3 -m json.tool | sed -n '1,40p'
-```
-
-### 6. 常见问题
-
-| 问题 | 原因 | 解决 |
-|---|---|---|
-| `binwalk -e` 解不出内容 | 固件加密 / 自定义头 | 换 `sasquatch` 手动解；或 `binwalk --extract --signature` 逐段看签名 |
-| `ModuleNotFoundError: No module named 'capstone'` | 依赖没装 | `pip install -r requirements.txt` 重装 |
-| `Permission denied` 运行脚本 | 可执行位缺失 | `chmod +x scripts/*.sh` |
-| QEMU 缺架构 | 不同架构固件需不同 qemu | Debian 系装 `qemu-user-static`；Alpine 按架构装 `qemu-<arch>`；或用 `fsa` 的 `emulation` 阶段内置镜像 |
-| `pip` 报 externally-managed-environment | PEP 668 保护（Debian/Ubuntu/Fedora 均有） | 用 venv 或 pipx，不要 `--break-system-packages` 污染系统 |
-| `binwalk: command not found` | 未装或不在 PATH | `pipx install binwalk`；`~/.local/bin` 加进 PATH |
-| `unsquashfs: command not found` | 包名随发行版不同 | Debian/Fedora/Arch/Alpine 装 `squashfs-tools`，openSUSE 装 `squashfs` |
-| 解包目录里有打不开的符号链接 | 固件含指向 `/dev/null` 的悬空链接 | 属正常现象，CLI 已做符号链接容错（`fsa/utils/traverse.py`） |
-| 能在 Windows / macOS 上跑吗 | 解包与仿真工具链是 Linux 原生 | 用容器或远程 Linux 主机；本项目不提供 Windows/WSL 适配层 |
+`fsa doctor` 会打印当前 `distro` / `package_manager` / `libc`，缺工具时按你的发行版给出安装提示；
+`make test` 不依赖任何宿主工具，装完 Python 侧依赖就能跑。
 
 ---
 
@@ -361,7 +261,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 |---|---|---|
 | `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
 | `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
-| `fsa analyze <固件或rootfs> --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录 | `runs/<run-id>/` 全量证据、状态、报告 |
+| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run | `runs/<run-id>/` 全量证据、状态、报告 |
 | `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
@@ -418,7 +318,7 @@ export OPENAI_API_KEY=sk-xxx
 ├── runs/                   # 分析报告与 JSON 产物
 ├── tests/                  # 单元 / 集成测试（CI 不依赖外部重型工具）
 └── docs/                   # 文档（索引见 docs/README.md）
-    ├── guide/              #   部署与演示、挖洞教程、CLI 测试方案
+    ├── guide/              #   各发行版安装、部署演示、挖洞教程、CLI 测试
     ├── external/           #   外部分析器：总纲、数据集、真机测试
     ├── design/             #   设计决策记录
     └── archive/            #   历史运行记录：回归、检出效果、四器接入核验
@@ -505,7 +405,8 @@ make lint      # ruff 全绿
 
 | 我想… | 看这里 |
 |---|---|
-| 在 Linux 上从零装好并录制演示 | [`docs/guide/deployment.md`](docs/guide/deployment.md)（含 7 个演示脚本与常见问题） |
+| 按发行版装好依赖 | [`docs/guide/install.md`](docs/guide/install.md)（六类发行版的命令、sasquatch 编译、排错表） |
+| 在 Linux 上从零部署并录制演示 | [`docs/guide/deployment.md`](docs/guide/deployment.md)（含 7 个演示脚本与常见问题） |
 | 用 CLI 从固件挖到漏洞 | [`docs/guide/hunting-workflow.md`](docs/guide/hunting-workflow.md)（选目标 → 解包 → 分析 → 10 问审计） |
 | 提交前跑一遍自测 | [`docs/guide/cli-testing.md`](docs/guide/cli-testing.md) |
 | 接入 SaTC / FirmRec / KLEE / BOND | [`docs/external/README.md`](docs/external/README.md)（编排、开关、降级边界） |
