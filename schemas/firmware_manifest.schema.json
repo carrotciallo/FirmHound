@@ -63,7 +63,11 @@
         "required": ["path", "score", "markers"],
         "properties": {
           "path": {"type": "string"},
-          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Sum of marker weights from rootfs_score.py, not a 0-1 confidence."
+          },
           "markers": {"type": "array", "items": {"type": "string"}}
         }
       }

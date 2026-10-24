@@ -16,6 +16,22 @@ from tools.firmware.rootfs_score import score_rootfs_candidates
 from tools.firmware.unpack import unpack
 
 
+def _flatten_kernel_hint(hint: Any) -> str | None:
+    """Render arch_detect's kernel hint as the single string the schema expects.
+
+    ``_kernel_hints`` returns ``{"version": ..., "vermagic": ...}`` because both
+    halves are useful when picking a kernel to rebuild against. The manifest
+    field is a one-line summary, so join whatever was found and drop the rest.
+    """
+    if hint is None or isinstance(hint, str):
+        return hint
+    if not isinstance(hint, dict):
+        return None
+    parts = [hint.get("version"), hint.get("vermagic")]
+    text = " ".join(str(part) for part in parts if part)
+    return text or None
+
+
 def build_manifest(
     firmware_path: str | Path,
     run_id: str,
@@ -76,7 +92,8 @@ def build_manifest(
         "bits": arch_result.get("bits"),
         "endian": arch_result.get("endian"),
         "libc": arch_result.get("libc"),
-        "kernel_hint": info.get("kernel_hint") or arch_result.get("kernel_hint"),
+        "kernel_hint": info.get("kernel_hint")
+        or _flatten_kernel_hint(arch_result.get("kernel_hint")),
         "web_servers": [],
         "elf_count": 0,
         "extraction_confidence": rootfs_result["extraction_confidence"],

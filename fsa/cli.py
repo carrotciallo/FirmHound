@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import uuid
@@ -16,6 +17,7 @@ from dotenv import load_dotenv
 
 from fsa.orchestrator.engine import Orchestrator, validate_run_id
 from fsa.schemas.loader import validate_all_examples
+from fsa.utils import console
 from fsa.utils.jsonio import load_json, load_yaml
 from fsa.utils.platform_info import detect as detect_platform
 from fsa.utils.platform_info import hint_for
@@ -23,12 +25,23 @@ from tools.firmware.diagnose import diagnose_firmware
 from tools.report.explain import build_evidence_ledger, render_ledger_markdown
 
 
+def _render_value(key: str, item: Any) -> Any:
+    """Colour one value according to what it means, not where it sits."""
+    if key == "status" and isinstance(item, str):
+        return console.status(item)
+    if key in {"run_dir", "report", "input", "run_id"} and item not in (None, ""):
+        return console.muted(item)
+    if item in (None, "", []):
+        return console.muted("-")
+    return item
+
+
 def _emit(value: dict[str, Any], as_json: bool) -> None:
     if as_json:
-        click.echo(json.dumps(value, ensure_ascii=False))
+        console.echo(json.dumps(value, ensure_ascii=False))
         return
     for key, item in value.items():
-        click.echo(f"{key}: {item}")
+        console.echo(f"{console.muted(key)}: {_render_value(key, item)}")
 
 
 def _status_from_checks(checks: dict[str, dict[str, Any]]) -> str:
@@ -158,7 +171,12 @@ def plan(
 
 
 @main.command()
-@click.argument("input_path", type=click.Path(path_type=Path, exists=True))
+@click.argument(
+    "input_paths",
+    nargs=-1,
+    required=True,
+    type=click.Path(path_type=Path, exists=True),
+)
 @click.option(
     "--input-type",
     type=click.Choice(["auto", "firmware", "rootfs"]),
@@ -177,12 +195,15 @@ def plan(
 @click.option("--vendor")
 @click.option("--model")
 @click.option("--version")
-@click.option("--run-id", help="Optional stable run identifier.")
-@click.option("--json-output", is_flag=True, help="Emit a machine-readable result.")
+@click.option(
+    "--run-id",
+    help="Optional stable run identifier; used as a prefix when several inputs are given.",
+)
+@click.option("--json-output", is_flag=True, help="Emit one JSON object per input.")
 @click.pass_context
 def analyze(
     ctx: click.Context,
-    input_path: Path,
+    input_paths: tuple[Path, ...],
     input_type: str,
     depth: str,
     authorization_holder: str,
@@ -194,56 +215,214 @@ def analyze(
     run_id: str | None,
     json_output: bool,
 ) -> None:
-    """Analyze a real firmware image or an already extracted ROOTFS directory."""
-    source = input_path.resolve()
-    detected_type = "rootfs" if source.is_dir() else "firmware"
-    selected_type = detected_type if input_type == "auto" else input_type
-    if selected_type == "rootfs" and not source.is_dir():
-        raise click.ClickException("--input-type rootfs requires a directory")
-    if selected_type == "firmware" and not source.is_file():
-        raise click.ClickException("--input-type firmware requires a file")
+    """Analyze firmware images or already extracted ROOTFS directories.
+
+    Each INPUT_PATH gets its own run directory. With one input, --run-id is
+    the run identifier; with several, it becomes a prefix and every run is
+    named <run-id>-<n>-<input>.
+    """
+    if run_id:
+        try:
+            validate_run_id(run_id)
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+    targets = _classify_inputs(input_paths, input_type)
+    options = {
+        "depth": depth,
+        "authorization_holder": authorization_holder,
+        "authorization_scope": authorization_scope,
+        "allow_emulation": allow_emulation,
+        "vendor": vendor,
+        "model": model,
+        "version": version,
+        "run_id": run_id,
+    }
+
+    results = []
+    for index, (source, kind) in enumerate(targets):
+        result = _analyse_one(ctx.obj["config"], source, kind, options, index, len(targets))
+        results.append(result)
+        _report_result(result, json_output, index, len(targets))
+
+    if len(results) > 1 and not json_output:
+        _report_summary(results)
+
+    if any(item["status"] != "done" for item in results):
+        raise click.exceptions.Exit(2)
+
+
+def _classify_inputs(
+    input_paths: tuple[Path, ...],
+    input_type: str,
+) -> list[tuple[Path, str]]:
+    """Resolve every input and decide whether it is a firmware image or a rootfs."""
+    targets: list[tuple[Path, str]] = []
+    for raw in input_paths:
+        source = raw.resolve()
+        detected = "rootfs" if source.is_dir() else "firmware"
+        kind = detected if input_type == "auto" else input_type
+        if kind == "rootfs" and not source.is_dir():
+            raise click.ClickException(f"--input-type rootfs requires a directory: {source}")
+        if kind == "firmware" and not source.is_file():
+            raise click.ClickException(f"--input-type firmware requires a file: {source}")
+        targets.append((source, kind))
+    return targets
+
+
+def _run_id_for(base: str | None, index: int, total: int, source: Path) -> str:
+    """Build a run identifier that stays unique and filesystem-safe."""
+    if total == 1:
+        return base or uuid.uuid4().hex[:12]
+    prefix = base or uuid.uuid4().hex[:8]
+    stem = source.stem if source.is_file() else source.name
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", stem).strip("-_").lower() or "input"
+    return validate_run_id(f"{prefix}-{index + 1}-{slug}"[:64])
+
+
+def _analyse_one(
+    config_path: Path,
+    source: Path,
+    kind: str,
+    options: dict[str, Any],
+    index: int,
+    total: int,
+) -> dict[str, Any]:
+    """Run one input and return a result record, never raising on analysis failure."""
+    result: dict[str, Any] = {
+        "status": "failed",
+        "input": str(source),
+        "input_type": kind,
+        "run_id": "",
+        "run_dir": "",
+        "report": None,
+        "final_verdict": None,
+    }
 
     try:
-        orchestrator = Orchestrator(config_path=ctx.obj["config"])
+        run_id = _run_id_for(options["run_id"], index, total, source)
+        orchestrator = Orchestrator(config_path=config_path)
         orchestrator.policy.check_path(source)
         task_input: dict[str, Any] = {
-            "task_id": run_id or uuid.uuid4().hex[:12],
+            "task_id": run_id,
             "firmware_path": str(source),
-            "vendor": vendor,
-            "model": model,
-            "version": version,
-            "depth": depth,
+            "vendor": options["vendor"],
+            "model": options["model"],
+            "version": options["version"],
+            "depth": options["depth"],
             "authorization": {
-                "holder": authorization_holder,
-                "scope": authorization_scope,
-                "allow_emulation": allow_emulation,
+                "holder": options["authorization_holder"],
+                "scope": options["authorization_scope"],
+                "allow_emulation": options["allow_emulation"],
                 "network_isolation": True,
             },
         }
-        if selected_type == "rootfs":
+        if kind == "rootfs":
             task_input["rootfs_path"] = str(source)
         task_card = orchestrator.planner.parse_task(task_input)
         structlog.get_logger().info(
             "analysis_started",
             run_id=task_card["task_id"],
-            input_type=selected_type,
-            depth=depth,
+            input_type=kind,
+            depth=options["depth"],
         )
         state = orchestrator.run(task_card)
     except Exception as exc:  # noqa: BLE001
-        structlog.get_logger().error("analysis_failed", error=str(exc))
-        raise click.ClickException(str(exc)) from exc
+        structlog.get_logger().error("analysis_failed", error=str(exc), input=str(source))
+        result["error"] = f"{type(exc).__name__}: {exc}"
+        return result
 
-    result = {
-        "status": state["status"],
-        "run_id": state["run_id"],
-        "run_dir": str(Path(orchestrator.config["paths"]["runs"]) / state["run_id"]),
-        "report": state.get("artifacts", {}).get("report"),
-        "final_verdict": state.get("artifacts", {}).get("final_verdict"),
-    }
-    _emit(result, json_output)
+    runs_dir = Path(orchestrator.config["paths"]["runs"])
+    result.update(
+        {
+            "status": state["status"],
+            "run_id": state["run_id"],
+            "run_dir": str(runs_dir / state["run_id"]),
+            "report": state.get("artifacts", {}).get("report"),
+            "final_verdict": state.get("artifacts", {}).get("final_verdict"),
+        }
+    )
     if state["status"] != "done":
-        raise click.exceptions.Exit(2)
+        result["error"] = _format_state_error(state)
+        result["failed_stages"] = state.get("failed_stages", [])
+        hint = _failure_hint(state)
+        if hint:
+            result["hint"] = hint
+    return result
+
+
+def _format_state_error(state: dict[str, Any]) -> str:
+    """Turn the persisted last_error into one readable line."""
+    error = state.get("last_error") or {}
+    stage = error.get("stage") or state.get("current_stage")
+    reason = error.get("reason") or "run stopped before reaching DONE"
+    return f"{stage}: {reason}" if stage else str(reason)
+
+
+def _failure_hint(state: dict[str, Any]) -> str:
+    """Suggest the next concrete step for the failures we know how to explain."""
+    error = state.get("last_error") or {}
+    stage = error.get("stage")
+    reason = str(error.get("reason", "")).lower()
+
+    if stage == "UNPACK" and "no rootfs" in reason:
+        return (
+            "no usable rootfs was produced: run 'fsa unpack-diagnose <firmware>' to see which "
+            "layer failed, then install unsquashfs / sasquatch (docs/guide/install.md)"
+        )
+    if "encrypted" in reason:
+        return (
+            "the payload is encrypted and needs decryption material; "
+            "see 'fsa unpack-diagnose <firmware>' and docs/guide/install.md"
+        )
+    if stage == "UNPACK":
+        return (
+            "unpack failed and its artifacts were kept; "
+            "'fsa unpack-diagnose <firmware>' shows which layer broke"
+        )
+    if stage:
+        return f"stage {stage} failed; artifacts were kept, resume with 'fsa resume <run_id>'"
+    return ""
+
+
+_RESULT_KEYS = ("status", "input", "input_type", "run_id", "run_dir", "report", "final_verdict")
+
+
+def _report_result(
+    result: dict[str, Any],
+    as_json: bool,
+    index: int,
+    total: int,
+) -> None:
+    """Print one input's outcome, as JSONL or as coloured key/value lines."""
+    if as_json:
+        console.echo(json.dumps(result, ensure_ascii=False))
+        return
+
+    if total > 1:
+        console.echo()
+        console.echo(console.label(f"[{index + 1}/{total}] {result['input']}"))
+
+    keys = _RESULT_KEYS if total > 1 else tuple(k for k in _RESULT_KEYS if k != "input_type")
+    for key in keys:
+        console.echo(f"{console.muted(key)}: {_render_value(key, result.get(key))}")
+
+    if result.get("error"):
+        console.echo(f"{console.muted('error')}: {console.bad(result['error'])}")
+    if result.get("hint"):
+        console.echo(f"{console.muted('hint')}: {console.warn(result['hint'])}")
+
+
+def _report_summary(results: list[dict[str, Any]]) -> None:
+    """One line per input, then the tally."""
+    console.echo()
+    console.echo(console.label("summary"))
+    for item in results:
+        console.echo(f"  {console.status(item['status'])}  {console.muted(item['input'])}")
+    done = sum(1 for item in results if item["status"] == "done")
+    tally = f"{done}/{len(results)} done"
+    console.echo(f"  {console.good(tally) if done == len(results) else console.warn(tally)}")
+
 
 
 @main.command()
@@ -358,23 +537,29 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
         _emit({"status": overall, "checks": checks}, True)
         return
 
-    click.echo(f"status: {overall}")
-    click.echo(
-        f"platform: {platform_info.family} · {platform_info.distro_name}"
+    console.echo(f"{console.muted('status')}: {console.status(overall)}")
+    console.echo(
+        f"{console.muted('platform')}: {platform_info.family} · {platform_info.distro_name}"
         f" · {platform_info.package_manager} · {platform_info.libc}"
     )
     for name in ("paths", "schemas", "runtime", "commands"):
         item = checks.get(name)
         if item is None:
             continue
-        detail = ""
-        if name == "commands" and item["missing"]:
-            detail += f"（可选工具缺: {', '.join(item['missing'])}）"
-            hints = item.get("install_hints") or {}
-            if hints:
-                joined = "; ".join(f"{cmd} → {hint}" for cmd, hint in hints.items())
-                detail += f" 安装提示: {joined}"
-        click.echo(f"{name}: {item['status']}{detail}")
+        console.echo(f"{console.muted(name)}: {console.status(item['status'])}")
+
+        if name == "paths":
+            for key, value in item.get("items", {}).items():
+                if value != "ok":
+                    console.echo(f"  {console.bad(f'{key}: {value}')}")
+        elif name == "schemas" and item.get("invalid_examples"):
+            joined = ", ".join(item["invalid_examples"])
+            console.echo(f"  {console.bad('invalid examples: ' + joined)}")
+        elif name == "commands" and item["missing"]:
+            missing = ", ".join(item["missing"])
+            console.echo(f"  {console.warn('missing optional tools: ' + missing)}")
+            for cmd, hint in (item.get("install_hints") or {}).items():
+                console.echo(f"  {console.muted(cmd)} → {console.paint(hint, console.CYAN)}")
 
 
 @main.command(name="unpack-diagnose")
@@ -395,15 +580,15 @@ def unpack_diagnose(ctx: click.Context, firmware_path: Path, json_output: bool) 
     if json_output:
         _emit(diagnosis, True)
         return
-    click.echo(f"status: {diagnosis['status']}")
-    click.echo(f"firmware: {diagnosis['firmware']}")
-    click.echo(f"sha256: {diagnosis['sha256']}")
-    click.echo(f"signature_count: {diagnosis['signature_count']}")
-    click.echo(f"selected_strategy: {diagnosis['selected_strategy']}")
-    click.echo(f"confidence: {diagnosis['confidence']}")
-    click.echo("recommendations:")
+    console.echo(f"{console.muted('status')}: {console.status(diagnosis['status'])}")
+    console.echo(f"{console.muted('firmware')}: {diagnosis['firmware']}")
+    console.echo(f"{console.muted('sha256')}: {console.muted(diagnosis['sha256'])}")
+    console.echo(f"{console.muted('signature_count')}: {diagnosis['signature_count']}")
+    console.echo(f"{console.muted('selected_strategy')}: {diagnosis['selected_strategy']}")
+    console.echo(f"{console.muted('confidence')}: {diagnosis['confidence']}")
+    console.echo(console.label("recommendations"))
     for item in diagnosis["recommendations"]:
-        click.echo(f"- {item}")
+        console.echo(f"- {item}")
 
 
 @main.command(name="status")

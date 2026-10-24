@@ -58,12 +58,12 @@ def _recommendations(
     recs: list[str] = []
     if encrypted or any(hit["kind"] == "openssl-salted" for hit in magic_hits):
         recs.append(
-            "检测到 OpenSSL Salted/加密载荷：需要厂商密码、密钥、"
-            "升级工具解密逻辑或已解密中间固件。"
+            "OpenSSL Salted / encrypted payload detected: the vendor password or key, "
+            "an upgraded decryption routine, or an already decrypted image is required."
         )
         recs.append(
-            "建议保存加密切片后逆向升级工具；不要把加密阻断样本写成"
-            "无漏洞或解包成功。"
+            "Keep the encrypted slice for reverse engineering. Do not record a "
+            "decryption-blocked sample as 'no vulnerabilities' or 'unpacked'."
         )
     if strategy:
         missing = [
@@ -73,21 +73,30 @@ def _recommendations(
         ]
         if missing:
             missing_tools = ", ".join(sorted(set(missing)))
-            recs.append(f"匹配到 {strategy['name']} 策略，但缺少提取器：{missing_tools}。")
+            recs.append(
+                f"Matched the {strategy['name']} strategy but the extractors are missing: "
+                f"{missing_tools}."
+            )
         else:
             recs.append(
-                f"匹配到 {strategy['name']} 策略，当前环境具备对应提取器，"
-                "可尝试正式 unpack。"
+                f"Matched the {strategy['name']} strategy and every extractor is available; "
+                "a real unpack can be attempted."
             )
     elif magic_hits:
         kinds = ", ".join(sorted({str(hit["kind"]) for hit in magic_hits}))
-        recs.append(f"未从 binwalk 直接匹配策略，但发现可 carving 魔数：{kinds}。")
+        recs.append(
+            f"No strategy matched binwalk signatures directly, "
+            f"but carveable magic was found: {kinds}."
+        )
     else:
-        recs.append("未发现明确文件系统魔数，建议检查厂商头、压缩层或是否为差分/签名升级包。")
+        recs.append(
+            "No filesystem magic was found. Check for a vendor header, an extra "
+            "compression layer, or a differential/signed upgrade package."
+        )
     if any(hit["kind"] == "squashfs" for hit in magic_hits) and not extractors.get("sasquatch"):
         recs.append(
-            "发现 SquashFS 迹象但缺少 sasquatch；Tenda 等非标准 SquashFS 固件"
-            "建议安装 sasquatch。"
+            "SquashFS signatures are present but sasquatch is not installed; "
+            "vendor-patched SquashFS images usually need it."
         )
     return recs
 

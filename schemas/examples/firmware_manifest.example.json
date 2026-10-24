@@ -22,7 +22,7 @@
   "rootfs_candidates": [
     {
       "path": "/tmp/extracted/run-20260817-001/squashfs-root",
-      "score": 0.95,
+      "score": 7,
       "markers": ["bin/busybox", "etc/init.d", "usr/bin/httpd"]
     }
   ],
@@ -33,7 +33,7 @@
   "kernel_hint": "Linux 2.6.36",
   "web_servers": ["httpd", "lighttpd"],
   "elf_count": 42,
-  "extraction_confidence": 0.95,
+  "extraction_confidence": 1.0,
   "status": "success",
   "tool_versions": {"binwalk": "2.3.4"},
   "remaining_limitations": []

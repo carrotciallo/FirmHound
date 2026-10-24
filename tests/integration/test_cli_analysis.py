@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "fixtures"))
 from elf_builder import write_elf64  # noqa: E402
 
 
-def _test_config(tmp_path: Path) -> Path:
+def _test_config(tmp_path: Path, extra_paths: tuple[Path, ...] = ()) -> Path:
     repo = Path(__file__).resolve().parents[2]
     runs = tmp_path / "runs"
     temp = tmp_path / "temp"
@@ -30,7 +30,7 @@ def _test_config(tmp_path: Path) -> Path:
         {
             "enforce": True,
             "abort_on_violation": True,
-            "allowed_paths": [str(runs), str(temp), str(rootfs)],
+            "allowed_paths": [str(runs), str(temp), str(rootfs), *map(str, extra_paths)],
             "blocked_paths": [],
             "command_blacklist": [],
             "network": {"allow_public": False, "allowed_hosts": ["localhost"]},
@@ -236,7 +236,7 @@ def test_cli_unpack_diagnose_reports_encrypted_firmware() -> None:
         payload = json.loads(result.output)
         assert payload["status"] == "blocked_needs_decryption"
         assert payload["magic_hits"]
-        assert any("加密" in item or "OpenSSL" in item for item in payload["recommendations"])
+        assert any("OpenSSL" in item for item in payload["recommendations"])
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 
@@ -277,5 +277,102 @@ def test_cli_explain_renders_candidate_ledger() -> None:
         assert result.exit_code == 0, result.output
         assert "漏洞证据账本" in result.output
         assert "十维评分" in result.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_analyze_runs_every_input_given() -> None:
+    """Several positional inputs each get their own run directory."""
+    workspace = (Path("tmp") / f"cli-multi-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        first = _rootfs(workspace)
+        second = workspace / "rootfs2"
+        shutil.copytree(first, second)
+        config = _test_config(workspace, (second,))
+
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(first),
+                str(second),
+                "--authorization-holder",
+                "fixture-owner",
+                "--run-id",
+                "multi",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        for name in ("multi-1-rootfs", "multi-2-rootfs2"):
+            state = load_json(workspace / "runs" / name / "state" / "run_state.json")
+            assert state["status"] == "done"
+        assert "2/2 done" in result.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_analyze_multiple_inputs_json_is_one_object_per_line() -> None:
+    workspace = (Path("tmp") / f"cli-multi-json-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        first = _rootfs(workspace)
+        second = workspace / "rootfs2"
+        shutil.copytree(first, second)
+        config = _test_config(workspace, (second,))
+
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(first),
+                str(second),
+                "--authorization-holder",
+                "fixture-owner",
+                "--json-output",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        records = [
+            json.loads(line) for line in result.output.splitlines() if line.startswith('{"status"')
+        ]
+        assert len(records) == 2
+        assert {record["input_type"] for record in records} == {"rootfs"}
+        assert all(record["status"] == "done" for record in records)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_analyze_prints_the_failure_reason() -> None:
+    """A failed stage has to say why; the reason used to stay in run_state.json."""
+    workspace = (Path("tmp") / f"cli-fail-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        firmware = workspace / "rootfs" / "junk.bin"
+        firmware.parent.mkdir(parents=True, exist_ok=True)
+        firmware.write_bytes(b"NOT-A-FIRMWARE" * 4)
+
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(firmware),
+                "--authorization-holder",
+                "fixture-owner",
+            ],
+        )
+
+        assert result.exit_code == 2, result.output
+        assert "UNPACK" in result.output
+        assert "hint" in result.output
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

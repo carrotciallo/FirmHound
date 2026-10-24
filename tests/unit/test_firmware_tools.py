@@ -8,7 +8,7 @@ from fsa.utils.proc import RunResult
 from tools.firmware.arch_detect import detect_architecture
 from tools.firmware.collect_info import _binwalk_signatures, collect_info
 from tools.firmware.rootfs_score import score_rootfs_candidates
-from tools.firmware.unpack import unpack
+from tools.firmware.unpack import STRATEGIES, _detect_strategy, unpack
 
 
 def _make_rootfs(path: Path, *, full: bool = True, extra_web: bool = False) -> None:
@@ -296,3 +296,37 @@ def test_arch_detect_consistent_elf(tmp_path: Path) -> None:
     assert result["architecture"] == "mips"
     assert result["bits"] == "ELF32"
     assert result["endian"] == "little"
+
+
+def test_detect_strategy_handles_binwalk_3_wording() -> None:
+    """binwalk 3 reports "SquashFS file system", with a space in the middle."""
+    strategy = _detect_strategy(
+        [{"description": "SquashFS file system, little endian, version: 4.0, compression: lzma"}]
+    )
+    assert strategy is not None
+    assert strategy["name"] == "squashfs"
+
+
+def test_detect_strategy_handles_legacy_binwalk_wording() -> None:
+    """binwalk 2's table says "Squashfs filesystem", no space."""
+    strategy = _detect_strategy([{"description": "Squashfs filesystem, little endian"}])
+    assert strategy is not None
+    assert strategy["name"] == "squashfs"
+
+
+def test_squashfs_strategy_tries_the_standard_extractor_first() -> None:
+    """unsquashfs reads lzma since 4.6, so it must not be skipped on lzma images."""
+    chain = next(item for item in STRATEGIES if item["name"] == "squashfs")["tools"]
+    assert [command[0] for command in chain] == ["unsquashfs", "sasquatch", "7z"]
+
+
+def test_squashfs_wins_over_gzip_signature() -> None:
+    """A firmware image carries both signatures; the filesystem is the target."""
+    strategy = _detect_strategy(
+        [
+            {"description": "gzip compressed data, from Unix"},
+            {"description": "SquashFS file system, compression: lzma"},
+        ]
+    )
+    assert strategy is not None
+    assert strategy["name"] == "squashfs"

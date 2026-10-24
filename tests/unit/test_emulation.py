@@ -125,7 +125,8 @@ def test_detect_qemu_unknown_arch() -> None:
     assert detect_qemu("nonexistent-arch") is None
 
 
-def test_l1_load_check_skips_without_qemu(tmp_path) -> None:
+def test_l1_load_check_skips_without_qemu(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("tools.emulation.qemu_user.detect_qemu", lambda arch: None)
     result = run_l1_load_check(tmp_path, "mipsel")
     assert result["status"] == "skipped"
     assert "limitation" in result

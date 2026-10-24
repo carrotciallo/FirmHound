@@ -109,7 +109,7 @@ def collect_info(firmware_path: str | Path) -> dict[str, Any]:
         "md5": md5_file(path),
         "file_size": path.stat().st_size,
         "file_type": _run_file(path),
-        "magic_bytes": _first_bytes(path, 256),
+        "magic_bytes": _first_bytes(path, 32),
         "binwalk_signatures": _binwalk_signatures(path),
         "strings_summary": {
             "line_count": len(strings_output.splitlines()),

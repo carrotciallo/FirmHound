@@ -16,28 +16,33 @@ from fsa.utils.proc import run_command
 OPENSSL_SALTED_MAGIC = b"Salted__"
 
 # Map from binwalk description keyword to extraction strategy.
+#
+# SquashFS is one strategy, not two: the compression variant is not knowable
+# from the keyword alone (binwalk reports "SquashFS file system", the legacy
+# 3.x table says "Squashfs filesystem", and the compression field is a
+# separate column), so the tool chain simply tries the tools in order of
+# quality. unsquashfs 4.6+ handles lzma, sasquatch covers the vendor-patched
+# variants it cannot, and 7z is the last resort. Splitting this on a
+# "lzma" keyword used to send standard images down a path with no usable
+# extractor at all.
 STRATEGIES: list[dict[str, Any]] = [
     {
-        "name": "squashfs_standard",
-        "keywords": ["Squashfs filesystem"],
-        "tools": [["unsquashfs", "-d", "{out}", "{fw}"]],
-    },
-    {
-        "name": "squashfs_lzma",
-        "keywords": ["squashfs", "lzma"],
+        "name": "squashfs",
+        "keywords": ["squashfs"],
         "tools": [
+            ["unsquashfs", "-d", "{out}", "{fw}"],
             ["sasquatch", "-d", "{out}", "{fw}"],
             ["7z", "x", "-o{out}", "{fw}"],
         ],
     },
     {
         "name": "ubi",
-        "keywords": ["UBI"],
+        "keywords": ["ubi"],
         "tools": [["ubireader_extract_images", "-o", "{out}", "{fw}"]],
     },
     {
         "name": "jffs2",
-        "keywords": ["JFFS2"],
+        "keywords": ["jffs2"],
         "tools": [["jefferson", "-d", "{out}", "{fw}"]],
     },
     {
@@ -138,13 +143,13 @@ CARVE_TARGETS: list[dict[str, Any]] = [
     {
         "magic": b"hsqs",
         "kind": "squashfs",
-        "strategies": ["squashfs_standard", "squashfs_lzma"],
+        "strategies": ["squashfs"],
         "max_hits": 16,
     },
     {
         "magic": b"sqsh",
         "kind": "squashfs",
-        "strategies": ["squashfs_standard", "squashfs_lzma"],
+        "strategies": ["squashfs"],
         "max_hits": 16,
     },
     {

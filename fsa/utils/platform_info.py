@@ -88,7 +88,7 @@ _COMMAND_PACKAGES: dict[str, dict[str, str]] = {
     "binwalk": {
         "apt": "binwalk",
         "dnf": "binwalk",
-        "pacman": "binwalk（AUR）",
+        "pacman": "binwalk (AUR)",
         "zypper": "pipx install binwalk",
         "apk": "pipx install binwalk",
     },
@@ -100,11 +100,11 @@ _COMMAND_PACKAGES: dict[str, dict[str, str]] = {
         "apk": "squashfs-tools",
     },
     "sasquatch": {
-        "apt": "源码编译：https://github.com/onekey-sec/sasquatch",
-        "dnf": "源码编译：https://github.com/onekey-sec/sasquatch",
-        "pacman": "sasquatch（AUR）",
-        "zypper": "源码编译：https://github.com/onekey-sec/sasquatch",
-        "apk": "源码编译：https://github.com/onekey-sec/sasquatch",
+        "apt": "build from source: https://github.com/onekey-sec/sasquatch",
+        "dnf": "build from source: https://github.com/onekey-sec/sasquatch",
+        "pacman": "sasquatch (AUR)",
+        "zypper": "build from source: https://github.com/onekey-sec/sasquatch",
+        "apk": "build from source: https://github.com/onekey-sec/sasquatch",
     },
     "7z": {
         "apt": "p7zip-full",
