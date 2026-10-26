@@ -1,5 +1,6 @@
 """Unit tests for fsa.utils helpers."""
 
+import sys
 from pathlib import Path
 
 from fsa.utils.hashing import md5_file, sha256_bytes, sha256_file
@@ -59,7 +60,7 @@ def test_jsonio_roundtrip(tmp_path: Path) -> None:
 
 def test_run_command_success() -> None:
     """run_command captures stdout and success status."""
-    result = run_command(["python", "-c", "print('ok')"])
+    result = run_command([sys.executable, "-c", "print('ok')"])
     assert result.status == "success"
     assert result.returncode == 0
     assert result.stdout.strip() == "ok"
@@ -67,12 +68,40 @@ def test_run_command_success() -> None:
 
 def test_run_command_failure() -> None:
     """run_command returns failed status without raising."""
-    result = run_command(["python", "-c", "import sys; sys.exit(1)"])
+    result = run_command([sys.executable, "-c", "import sys; sys.exit(1)"])
     assert result.status == "failed"
     assert result.returncode == 1
 
 
 def test_run_command_timeout() -> None:
     """run_command returns timeout status for slow commands."""
-    result = run_command(["python", "-c", "import time; time.sleep(10)"], timeout=0.1)
+    result = run_command([sys.executable, "-c", "import time; time.sleep(10)"], timeout=0.1)
     assert result.status == "timeout"
+
+
+def test_run_command_missing_executable() -> None:
+    """A missing binary is a failed result, not an exception.
+
+    Optional external tools (binwalk, docker, qemu, ...) are routinely
+    absent; probing for them must degrade, not crash the caller.
+    """
+    result = run_command(["definitely-not-a-real-tool-firmhound", "--help"])
+    assert result.status == "failed"
+    assert result.returncode == -1
+    assert result.stderr
+
+
+def test_run_command_empty_command() -> None:
+    """An empty command is a failed result, not an exception."""
+    result = run_command([])
+    assert result.status == "failed"
+    assert result.returncode == -1
+
+
+def test_run_command_missing_cwd(tmp_path: Path) -> None:
+    """A nonexistent cwd is a failed result, not an exception."""
+    result = run_command(
+        [sys.executable, "-c", "print('ok')"], cwd=tmp_path / "does-not-exist"
+    )
+    assert result.status == "failed"
+    assert result.returncode == -1

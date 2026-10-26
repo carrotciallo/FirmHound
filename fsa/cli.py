@@ -652,7 +652,10 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
         ),
     }
 
-    required_commands = ["python"]
+    # Linux distributions ship the interpreter as ``python3``; a bare
+    # ``python`` alias is not guaranteed to exist (e.g. Debian/Ubuntu
+    # without python-is-python3), so do not require it here.
+    required_commands = ["python3"]
     optional_commands = ["docker", "binwalk", "unsquashfs", "sasquatch", "7z", "readelf", "klee"]
     command_checks = {cmd: bool(shutil.which(cmd)) for cmd in required_commands + optional_commands}
     missing_commands = [
