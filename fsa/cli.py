@@ -101,6 +101,12 @@ def main(ctx: click.Context, config: Path) -> None:
 @click.option("--version")
 @click.option("--run-id", help="Optional stable run identifier.")
 @click.option("--json-output", is_flag=True, help="Emit a machine-readable plan.")
+@click.option(
+    "--blind/--no-blind",
+    default=False,
+    show_default=True,
+    help="Blind benchmark run: recurrence-only tools are force-disabled.",
+)
 @click.pass_context
 def plan(
     ctx: click.Context,
@@ -116,6 +122,7 @@ def plan(
     version: str | None,
     run_id: str | None,
     json_output: bool,
+    blind: bool,
 ) -> None:
     """Parse a task and show the planned CLI execution stages without running tools."""
     if not any((task, task_package, firmware_path)):
@@ -141,6 +148,7 @@ def plan(
             "model": model,
             "version": version,
             "depth": depth,
+            "blind": blind,
             "authorization": {
                 "holder": authorization_holder,
                 "scope": authorization_scope,
@@ -161,6 +169,7 @@ def plan(
             "objective": task_card["objective"],
             "firmware_path": task_card["firmware_path"],
             "depth": task_card["depth"],
+            "blind": bool(task_card.get("blind", False)),
             "stages": execution_plan["stages"],
             "requires_human_gate": task_card["requires_human_gate"],
             "human_gate_reasons": task_card["human_gate_reasons"],
@@ -200,6 +209,12 @@ def plan(
     help="Optional stable run identifier; used as a prefix when several inputs are given.",
 )
 @click.option("--json-output", is_flag=True, help="Emit one JSON object per input.")
+@click.option(
+    "--blind/--no-blind",
+    default=False,
+    show_default=True,
+    help="Blind benchmark run: recurrence-only tools are force-disabled.",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -214,6 +229,7 @@ def analyze(
     version: str | None,
     run_id: str | None,
     json_output: bool,
+    blind: bool,
 ) -> None:
     """Analyze firmware images or already extracted ROOTFS directories.
 
@@ -237,6 +253,7 @@ def analyze(
         "model": model,
         "version": version,
         "run_id": run_id,
+        "blind": blind,
     }
 
     results = []
@@ -310,6 +327,7 @@ def _analyse_one(
             "model": options["model"],
             "version": options["version"],
             "depth": options["depth"],
+            "blind": bool(options.get("blind", False)),
             "authorization": {
                 "holder": options["authorization_holder"],
                 "scope": options["authorization_scope"],
@@ -422,7 +440,6 @@ def _report_summary(results: list[dict[str, Any]]) -> None:
     done = sum(1 for item in results if item["status"] == "done")
     tally = f"{done}/{len(results)} done"
     console.echo(f"  {console.good(tally) if done == len(results) else console.warn(tally)}")
-
 
 
 @main.command()

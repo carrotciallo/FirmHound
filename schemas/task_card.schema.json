@@ -38,6 +38,11 @@
     "model": {"type": ["string", "null"]},
     "version": {"type": ["string", "null"]},
     "depth": {"enum": ["quick", "standard", "full"], "default": "standard"},
+    "blind": {
+      "type": "boolean",
+      "default": false,
+      "description": "Blind benchmark run; recurrence-only tools are force-disabled."
+    },
     "constraints": {"type": "array", "items": {"type": "string"}},
     "success_criteria": {"type": "array", "items": {"type": "string"}},
     "authorization": {

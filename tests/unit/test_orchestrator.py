@@ -31,6 +31,19 @@ def test_planner_parse_cli(planner: Planner) -> None:
     )
     assert card["vendor"] == "Tenda"
     assert card["requires_human_gate"] is False
+    assert card["blind"] is False
+
+
+def test_planner_keeps_blind_flag(planner: Planner) -> None:
+    card = planner.parse_task(
+        {
+            "task_id": "T-blind",
+            "firmware_path": "firmwares/ac15.bin",
+            "authorization": "authorized by device owner",
+            "blind": True,
+        }
+    )
+    assert card["blind"] is True
 
 
 def test_planner_missing_authorization_triggers_gate(planner: Planner) -> None:

@@ -27,10 +27,10 @@ tags: [report, verdict, compliance, m10, redaction]
 
 ## 输出
 
-- `report.md`：固定 22 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
+- `report.md`：固定 23 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
 - `final_verdict.json`：`{run_id, firmware_sha256, findings:[...], stats:{...}}`
 
-## 报告 22 节固定骨架
+## 报告 23 节固定骨架
 
 1. 执行摘要
 2. 任务与授权范围
@@ -50,10 +50,11 @@ tags: [report, verdict, compliance, m10, redaction]
 16. 误报控制摘要
 17. 本地动态验证
 18. 外部分析器结果
-19. 证据链与可追溯性
-20. 限制与待验证事实
-21. 修复建议
-22. 最终结论
+19. 复发漏洞（FirmRec）
+20. 证据链与可追溯性
+21. 限制与待验证事实
+22. 修复建议
+23. 最终结论
 
 ## 执行流程
 
@@ -80,7 +81,7 @@ tags: [report, verdict, compliance, m10, redaction]
    - `NEED_DYNAMIC` 但安全门不过 → 标注 `dynamic_skipped` 及原因，不虚构验证结果。
 
 6. **双产物写出**
-   - `report.md` 用固定 20 节模板渲染；`final_verdict.json` 通过 `verdict.schema.json` 校验。
+   - `report.md` 用固定 23 节模板渲染；`final_verdict.json` 通过 `verdict.schema.json` 校验。
 
 ## 失败降级路径
 
@@ -95,6 +96,6 @@ tags: [report, verdict, compliance, m10, redaction]
 
 ## 验收标准
 
-- 对任一 run 生成报告：22 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
+- 对任一 run 生成报告：23 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
 - 报告中不出现任何可复现攻击参数（脱敏后）。
 - 全部 REJECT 场景如实输出「未发现强证据」。

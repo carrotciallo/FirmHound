@@ -122,6 +122,27 @@ def _tool_cfg(global_ext: dict[str, Any], tool: str) -> dict[str, Any]:
     return cfg
 
 
+def _resolve_firmware_path(run_dir: Path) -> Path | None:
+    """Return the original firmware image recorded in the task card, if any.
+
+    ``firmware_path`` can be the ``pending_human_input`` sentinel or a directory
+    when the operator submitted an extracted rootfs. Only a real file is useful
+    for upstream FirmRec; the runner falls back to packing the rootfs.
+    """
+    task_path = run_dir / "state" / "task_card.json"
+    if not task_path.is_file():
+        return None
+    try:
+        card = json.loads(task_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    raw = str((card or {}).get("firmware_path") or "").strip()
+    if not raw or raw == "pending_human_input":
+        return None
+    path = Path(raw).expanduser()
+    return path if path.is_file() else None
+
+
 def _load_candidates(run_dir: Path) -> list[dict[str, Any]]:
     """Load the candidate set for external analyzers.
 
@@ -269,8 +290,9 @@ def _run_tool(tool: str, run_dir: str | Path, config_path: str | None = None) ->
     ctx = AnalysisContext(
         run_id=run_dir.name,
         rootfs_dir=rootfs,
-        candidates=_load_candidates(run_dir),
         workdir=workdir,
+        firmware_path=_resolve_firmware_path(run_dir),
+        candidates=_load_candidates(run_dir),
         timeout_s=int(cfg.get("timeout_s", 3600)),
         config=cfg,
     )

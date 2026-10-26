@@ -34,6 +34,7 @@ from tools.external.base import normalize_addr, normalize_binary_id
 from tools.external.firmrec.sanitize import sanitize_poc
 
 PARSER_VERSION = "firmrec-parser-v1"
+RESULT_PARSER_VERSION = "firmrec-result-parser-v1"
 
 _CVE_RE = re.compile(r"CVE-\d{4}-\d{3,6}", re.I)
 _ADDR_RE = re.compile(r"0x[0-9a-fA-F]{4,}")
@@ -416,12 +417,275 @@ def parse_firmrec_output(
     return findings, stats
 
 
+# --------------------------------------------------------------------------- #
+# upstream result.csv (the real FirmRec output)
+# --------------------------------------------------------------------------- #
+
+
+def _norm_key(key: str | None) -> str:
+    return str(key or "").strip().lower().replace(" ", "_")
+
+
+def _result_row(row: dict[str, Any]) -> dict[str, str]:
+    return {
+        _norm_key(key): str(value or "").strip() for key, value in row.items() if key is not None
+    }
+
+
+def _vuln_class_for_reason(reason: str, sink: str) -> str:
+    text = f"{reason} {sink}".lower()
+    if any(word in text for word in ("command", "cmd", "rce", "system", "popen")):
+        return "command_injection"
+    if any(word in text for word in ("overflow", "buffer", "strcpy", "memcpy", "sprintf")):
+        return "overflow"
+    if any(word in text for word in ("path traversal", "directory traversal", "lfi")):
+        return "path_traversal"
+    if any(word in text for word in ("auth", "bypass")):
+        return "auth_bypass"
+    if any(word in text for word in ("config", "nvram")):
+        return "config_injection"
+    if any(word in text for word in ("format", "printf")):
+        return "format_string"
+    return "other"
+
+
+def _source_type_for(source: str) -> str:
+    name = source.strip().lower()
+    if name in {"getenv", "secure_getenv"}:
+        return "environment"
+    if name.startswith("nvram"):
+        return "nvram"
+    if name in {"recv", "recvfrom", "read", "socket", "accept"}:
+        return "socket_buffer"
+    return "unknown"
+
+
+def matched_cve_for_refs(vuln_refs: list[str]) -> str:
+    """Return the CVE when the experiment used exactly one signature.
+
+    ``result.csv`` does not carry the matched CVE. If several signatures were
+    used (or none can be parsed) we return an empty string rather than guess;
+    recurrence isolation does not depend on this field (the fusion layer splits
+    on ``tool == "firmrec"`` and force-isolates the recurrence batch).
+    """
+    cves: list[str] = []
+    for ref in vuln_refs:
+        match = _CVE_RE.search(ref)
+        if match and match.group(0).upper() not in cves:
+            cves.append(match.group(0).upper())
+    return cves[0] if len(cves) == 1 else ""
+
+
+def _normalize_entry_addr(value: str) -> str:
+    """Normalize ``entry_addr`` from hex or decimal without confusing the two."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        return hex(int(text, 0))
+    except ValueError:
+        return normalize_addr(text)
+
+
+def parse_result_csv(
+    path: Path,
+    *,
+    rootfs: Path,
+    run_id: str,
+    tool_version: str = "",
+    duration_s: float = 0.0,
+    vuln_refs: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], ParseStats]:
+    """Parse upstream FirmRec's ``inout/emu_results/result.csv``.
+
+    Columns: ``firmware_id, vendor, bin_path, entry_addr, source, keyword, sink,
+    vuln_reason, run_time``. Malformed rows are skipped and counted; the reader
+    never raises.
+    """
+    stats = ParseStats()
+    path = Path(path)
+    if not path.is_file():
+        stats.note(f"result.csv missing: {path}")
+        return [], stats
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError as exc:
+        stats.note(f"result.csv unreadable: {exc}")
+        return [], stats
+    if not text.strip():
+        stats.note(f"result.csv is empty: {path}")
+        return [], stats
+
+    stats.files_seen.append(path.name)
+    refs = list(vuln_refs or [])
+    matched_cve = matched_cve_for_refs(refs)
+    merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    for row in csv.DictReader(text.splitlines()):
+        det = _result_row(row)
+        vuln_flag = (det.get("vuln") or det.get("is_vuln") or "").upper()
+        if vuln_flag in {"NORM", "NORMAL", "FALSE", "0", "NO", "BENIGN"}:
+            continue
+        bin_path = det.get("bin_path", "").lstrip("/")
+        sink_func = det.get("sink", "")
+        if not bin_path or not sink_func:
+            stats.unparsed_lines += 1
+            continue
+        addr = _normalize_entry_addr(det.get("entry_addr"))
+        vuln_class = _vuln_class_for_reason(det.get("vuln_reason", ""), sink_func)
+        binary_id = normalize_binary_id(rootfs, bin_path)
+        key = (binary_id, addr, vuln_class)
+        if key in merged:
+            continue
+
+        source_func = det.get("source", "")
+        keyword = det.get("keyword", "")
+        confidence = compute_confidence(None, has_entry=bool(keyword))
+        slug = re.sub(r"[^A-Za-z0-9]+", "-", binary_id).strip("-") or "unknown"
+        notes = (
+            f"parser={RESULT_PARSER_VERSION}; recurrence=true; "
+            f"vendor={det.get('vendor', '')}; firmware_id={det.get('firmware_id', '')}; "
+            f"run_time={det.get('run_time', '')}; source_function={source_func}; "
+            f"keyword={keyword}; vuln_refs={','.join(refs)}; "
+            f"confidence=0.5+0.2*entry"
+        )
+        finding: dict[str, Any] = {
+            "finding_id": f"firmrec-{slug}-{addr or 'na'}",
+            "tool": "firmrec",
+            "tool_version": tool_version or "unknown",
+            "run_id": run_id,
+            "binary_id": binary_id,
+            "vuln_class": vuln_class,
+            "entry_point": {"type": "unknown", "path": bin_path},
+            "source": {
+                "type": _source_type_for(source_func),
+                "name": source_func,
+                "evidence": f"firmrec:source={source_func};keyword={keyword}",
+            },
+            "sink": {
+                "function": sink_func,
+                "addr": addr,
+                "type": _sink_type_for(vuln_class, sink_func),
+            },
+            "call_trace": (
+                [{"addr": addr, "func": sink_func, "note": "FirmRec concolic alarm"}]
+                if addr
+                else []
+            ),
+            "confidence": confidence,
+            "status": "ok",
+            "duration_s": round(duration_s, 1),
+            "notes": notes,
+        }
+        if matched_cve:
+            finding["matched_cve"] = matched_cve
+        merged[key] = finding
+
+    findings = list(merged.values())
+    if not findings:
+        stats.note("result.csv contained no usable vulnerability rows")
+    return findings, stats
+
+
+def _apply_poc_info(
+    findings: list[dict[str, Any]],
+    poc_dir: Path,
+    *,
+    rootfs: Path,
+) -> None:
+    """Attach sanitized PoC metadata to matching result.csv findings."""
+    if not poc_dir.exists():
+        return
+    stats = ParseStats()
+    detections = parse_poc_info(poc_dir, stats)
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for finding in findings:
+        sink = finding.get("sink") or {}
+        by_key[(str(finding.get("binary_id", "")), normalize_addr(sink.get("addr")))] = finding
+    for det in detections:
+        binary = str(det.get("binary", "")).lstrip("/")
+        if not binary:
+            continue
+        key = (normalize_binary_id(rootfs, binary), normalize_addr(det.get("addr")))
+        target = by_key.get(key)
+        if target is None:
+            continue
+        target["validation"] = {"triggered": None, "probe": "none", "poc_sanitized": True}
+        target["notes"] = str(target.get("notes", "")) + "; poc_sanitized=true"
+
+
+def parse_upstream_output(
+    inout_dir: Path,
+    *,
+    rootfs: Path,
+    run_id: str,
+    tool_version: str = "",
+    duration_s: float = 0.0,
+    vuln_refs: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], ParseStats]:
+    """Parse an upstream FirmRec ``inout`` directory (result.csv + poc_info).
+
+    Upstream versions disagree on the output directory name: the Docker image
+    writes ``emu_results`` in some releases and ``simexp_results`` in others, and
+    older builds write ``inout/result.csv``. Search all known locations, then
+    fall back to a recursive search, and merge rows from every file found.
+    """
+    inout = Path(inout_dir)
+    stats = ParseStats()
+    candidates = [
+        inout / "emu_results" / "result.csv",
+        inout / "simexp_results" / "result.csv",
+        inout / "result.csv",
+    ]
+    paths = [path for path in candidates if path.is_file()]
+    if not paths:
+        paths = sorted(inout.rglob("result.csv"))
+    if not paths:
+        stats.note(f"no upstream result.csv under: {inout}")
+        return [], stats
+
+    findings: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for result_path in paths:
+        parsed_findings, parsed = parse_result_csv(
+            result_path,
+            rootfs=rootfs,
+            run_id=run_id,
+            tool_version=tool_version,
+            duration_s=duration_s,
+            vuln_refs=vuln_refs,
+        )
+        stats.files_seen.extend(parsed.files_seen)
+        stats.unparsed_lines += parsed.unparsed_lines
+        stats.dropped_unsafe += parsed.dropped_unsafe
+        for note in parsed.limitations:
+            stats.note(note)
+        for finding in parsed_findings:
+            sink = finding.get("sink") or {}
+            key = (
+                str(finding.get("binary_id", "")),
+                normalize_addr(sink.get("addr")),
+                str(finding.get("vuln_class", "")),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(finding)
+
+    _apply_poc_info(findings, inout / "poc_info", rootfs=rootfs)
+    return findings, stats
+
+
 __all__ = [
     "PARSER_VERSION",
+    "RESULT_PARSER_VERSION",
     "ParseStats",
     "parse_vulns_md",
     "parse_pg_csv",
     "parse_poc_info",
     "compute_confidence",
     "parse_firmrec_output",
+    "parse_result_csv",
+    "parse_upstream_output",
+    "matched_cve_for_refs",
 ]

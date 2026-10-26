@@ -107,7 +107,7 @@ def test_cli_analyze_rootfs_reaches_done(depth: str) -> None:
         assert load_json(run / "artifacts" / "binary_summaries.json")["summaries"]
         assert load_json(run / "artifacts" / "candidates.json")["candidates"]
         assert load_json(run / "artifacts" / "verdict.json")["verdicts"]
-        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 22
+        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 23
         assert "误报控制摘要" in (run / "report.md").read_text(encoding="utf-8")
         assert (run / "final_verdict.json").is_file()
         stats = load_json(run / "final_verdict.json")["stats"]
@@ -154,6 +154,33 @@ def test_cli_plan_rejects_missing_firmware_path() -> None:
 
         assert result.exit_code != 0
         assert "firmware path not found" in result.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_plan_exposes_blind_flag() -> None:
+    workspace = (Path("tmp") / f"cli-plan-blind-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "plan",
+                "--task",
+                "分析固件",
+                "--authorization-holder",
+                "fixture-owner",
+                "--blind",
+                "--json-output",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["blind"] is True
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

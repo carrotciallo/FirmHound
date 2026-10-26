@@ -58,12 +58,32 @@ external:
     enabled: false
     # Recurring-vulnerability detection. Requires a known-vuln signature DB and
     # is isolated so it never participates in a blind benchmark run.
-    image: xylearn/firmrec-base   # docker image; pulled on first enabled run
+    backend: auto                  # auto | local | docker
+    # Native backend (recommended). repo_dir must be inside a safety-whitelisted
+    # path (e.g. ./vendor/FirmRec) or explicitly added to config/safety.yaml.
+    repo_dir: ""                   # or FSA_FIRMREC_REPO_DIR
+    python_bin: ""                 # FirmRec Python 3.9 env; or FSA_FIRMREC_PYTHON_BIN
+    ghidra_headless: ""            # /opt/ghidra/support/analyzeHeadless
+    firmrec_static_jar: ""         # default <repo_dir>/firmentry/firmrec-static.jar
+    pg_user: root
+    pg_password: firmrec           # or FSA_FIRMREC_PG_PASSWORD
+    pg_database: ""                # default firmrec_<run_id> (per-run isolation)
+    vendor: unknown                # staged images/<VENDOR>/ directory
+    image_name: ""                 # optional override for the staged image name
+    allow_rootfs_tar: true         # rootfs-only runs are packed as a tar (limited)
+    # Docker fallback.
+    image: xylearn/firmrec-base    # pulled on first enabled docker run
+    # Upstream vuln_info (<VENDOR>/<NAME>/meta.json + vulnerable firmware).
+    vuln_info_dir: ""              # operator-prepared upstream tree (preferred)
+    official_vuln_info_path: ""    # upstream directory when vuln_info_source=official
+    vuln_firmware_dir: ""          # our mode: <CVE>/<firmware image> + input descriptor
     signature_db: ./benchmarks/CVEs
-    vuln_info_source: our         # our | official (our = 9-CVE knowledge base)
-    official_vuln_info_path: ""   # required non-empty upstream JSON when source=official
+    vuln_info_source: our          # our | official (our = fixture/methodology mode)
     mode: signature_only           # blind runs are forbidden
     timeout_s: 7200                # pipeline + PostgreSQL warm-up cap
+    llm_key: ""                    # optional; upstream input-entry search
+    llm_url: ""                    # full chat/completions endpoint
+    llm_model: ""
 
   klee:
     enabled: false

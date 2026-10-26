@@ -10,6 +10,10 @@ allowed_paths:
   - "./tmp"
   - "./tests/fixtures"
   - "./firmware_samples"
+  # External tool checkouts (e.g. FirmRec native repo_dir). Paths are resolved
+  # through symlinks, so clone/copy the repo here instead of linking to /opt.
+  # Add absolute /opt/... paths here explicitly if you keep tools outside.
+  - "./vendor"
 
 # Deny reading/writing these paths even if they are under an allowed root.
 blocked_paths:

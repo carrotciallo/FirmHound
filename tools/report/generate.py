@@ -31,6 +31,7 @@ _SECTIONS = [
     "误报控制摘要",
     "本地动态验证",
     "外部分析器结果",
+    "复发漏洞（FirmRec）",
     "证据链与可追溯性",
     "限制与待验证事实",
     "修复建议",
@@ -40,6 +41,37 @@ _SECTIONS = [
 
 def _count(payload: Any, key: str) -> int:
     return len(payload.get(key, [])) if isinstance(payload, dict) else 0
+
+
+def _finding_count(payload: Any) -> int:
+    """Count findings whether the artifact stores a list or a precomputed int."""
+    if not isinstance(payload, dict):
+        return 0
+    findings = payload.get("findings", 0)
+    if isinstance(findings, bool):
+        return 0
+    if isinstance(findings, int):
+        return findings
+    if isinstance(findings, list):
+        return len(findings)
+    return 0
+
+
+def _tool_statuses(payload: Any) -> str:
+    """Summarize per-tool statuses from ``all.json`` (``per_tool``) or legacy keys."""
+    if not isinstance(payload, dict):
+        return "未启用"
+    per_tool = payload.get("per_tool")
+    if isinstance(per_tool, dict) and per_tool:
+        parts = []
+        for name, info in sorted(per_tool.items()):
+            status = info.get("status") if isinstance(info, dict) else str(info)
+            parts.append(f"{name}={status or 'unknown'}")
+        return ", ".join(parts)
+    statuses = payload.get("tool_statuses")
+    if isinstance(statuses, dict) and statuses:
+        return ", ".join(f"{name}={status}" for name, status in sorted(statuses.items()))
+    return "未启用"
 
 
 def _false_positive_summary(
@@ -96,12 +128,24 @@ def _section_body(
     verdict: dict[str, Any],
     validation: dict[str, Any],
     external: dict[str, Any],
+    recurrence: dict[str, Any],
 ) -> str:
     inventory = binaries.get("inventory", {}) if isinstance(binaries, dict) else {}
     rows = binaries.get("summaries", []) if isinstance(binaries, dict) else []
     ranked = ranking.get("candidates", []) if isinstance(ranking, dict) else []
     verdicts = verdict.get("verdicts", []) if isinstance(verdict, dict) else []
     fp_summary = _false_positive_summary(ranking, verdict)
+    recurrence_findings = recurrence.get("findings", []) if isinstance(recurrence, dict) else []
+    if not isinstance(recurrence_findings, list):
+        recurrence_findings = []
+    isolated = sum(
+        1 for item in recurrence_findings if isinstance(item, dict) and item.get("blind_isolated")
+    )
+    cves: list[str] = []
+    for item in recurrence_findings:
+        cve = str(item.get("matched_cve") or "") if isinstance(item, dict) else ""
+        if cve and cve not in cves:
+            cves.append(cve)
     values = {
         "执行摘要": f"完成 {_count(surfaces, 'surfaces')} 个攻击面、{len(rows)} 个 ELF 与 {len(ranked)} 个候选的可追溯分析。",
         "任务与授权范围": f"授权主体：{task['authorization']['holder']}；范围：{task['authorization']['scope']}；仅分析提交的输入。",
@@ -132,8 +176,13 @@ def _section_body(
         ),
         "本地动态验证": f"状态：{validation.get('status', '未执行') if isinstance(validation, dict) else '未执行'}；不将加载测试表述为漏洞复现。",
         "外部分析器结果": (
-            f"规范化外部发现：{len(external.get('findings', []))}；"
-            f"工具状态：{external.get('tool_statuses', {}) or '未启用'}。"
+            f"规范化外部发现：{_finding_count(external)}；"
+            f"工具状态：{_tool_statuses(external)}。"
+        ),
+        "复发漏洞（FirmRec）": (
+            f"复发发现：{_finding_count(recurrence)} 条；盲跑隔离：{isolated} 条；"
+            f"命中签名：{', '.join(cves[:5]) or '无'}。"
+            "本节依赖已知漏洞签名，不属于零先验能力，不计入 Blind Benchmark 指标。"
         ),
         "证据链与可追溯性": "每个候选引用独立 evidence_id，决策和阶段状态保存在运行目录。",
         "限制与待验证事实": "静态 source/sink 共存不等于数据流可达；缺少调用链的候选必须通过反编译或隔离动态验证。",
@@ -154,6 +203,7 @@ def execute_report(run_dir: str) -> dict[str, Any]:
     verdict = load_artifact(run, "verdict.json", {"run_id": run.name, "verdicts": []})
     validation = load_artifact(run, "local_validation.json", {})
     external = load_artifact(run, "external_findings/all.json", {})
+    recurrence = load_artifact(run, "external_findings/recurrence_findings.json", {})
     validate(verdict, schema_name="verdict")
 
     lines = [f"# 固件安全智能体分析报告 — {run.name}", ""]
@@ -172,6 +222,7 @@ def execute_report(run_dir: str) -> dict[str, Any]:
                     verdict,
                     validation,
                     external,
+                    recurrence,
                 ),
                 "",
             ]

@@ -24,7 +24,7 @@ CI 与 Blind Benchmark 不下载镜像、不访问网络、不依赖商业软件
 3. `SYMEX_PRUNE`：KLEE 回写可达 witness 或不可达 counterevidence。
 4. `RANK` / `VERIFY_TOP_K`：仍使用原十维 30 分制与反证规则。
 5. `CONSTRAINED_VALIDATION`：mini-BOND 仅对授权仿真环境执行。
-6. `REPORT`：在「外部分析器结果」一节展示交叉验证、限制与隔离声明。
+6. `REPORT`：在「外部分析器结果」展示交叉验证与限制，在「复发漏洞（FirmRec）」单独展示隔离的复发结论。
 
 ## 3. 安装与启用
 
@@ -38,10 +38,20 @@ external:
     enabled: true
   firmrec:
     enabled: false
+    backend: auto        # auto | local | docker；推荐本地原生
   klee:
     enabled: true
   bond:
     enabled: false
+```
+
+FirmRec 原生后端（不依赖 Docker）的完整安装见
+[`../guide/firmrec-native.md`](../guide/firmrec-native.md)：
+
+```bash
+make firmrec-deps FIRMREC_PYTHON=python3.9   # 独立 .venv-firmrec
+make firmrec-doctor                          # 检查 repo/python/Ghidra/PostgreSQL
+make firmrec-smoke RUN_DIR=runs/<id>         # 对已有 run 执行
 ```
 
 探测不会执行分析，也不会因缺失返回非零：
@@ -64,7 +74,7 @@ python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/
 | 工具 | 依赖 | 缺失时状态 | 不可声称的能力 |
 |---|---|---|---|
 | SaTC | Docker、Ghidra、angr | skipped | 未跑真实镜像时不能声称完成跨函数实测 |
-| FirmRec | Docker、PostgreSQL、已知漏洞签名 | skipped/FORCED_DISABLE | 不能计入 Blind 指标 |
+| FirmRec | 本地：Python 3.9 + Ghidra 10.2.2 + PostgreSQL；或 Docker 镜像；已知漏洞签名 | skipped/FORCED_DISABLE | 不能计入 Blind 指标；`our` fixture 模式没有漏洞固件时不会伪造签名 |
 | KLEE | LLVM bitcode、KLEE/Z3 | skipped/timeout | harness infeasible 不等于真实固件安全 |
 | mini-BOND | 可选 Ghidra、隔离仿真目标、安全门 | skipped/unsafe | 内置限界 HTTP 探针；模拟模式不生成 finding |
 
@@ -74,9 +84,12 @@ python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/
 ## 5. 安全红线
 
 - 工作目录仅允许 `./tmp/external/<tool>/<run_id>/`；
+- FirmRec 的 `repo_dir` 必须位于 `allowed_paths` 内（推荐 `./vendor/FirmRec`），
+  外部路径需显式加入 `config/safety.yaml`；
 - BOND 目标只允许仿真与私有网段，且四道安全门全部通过；
 - 禁止真机、公网、反弹 shell、持久化、下载执行和破坏性命令；
-- LLM 调用走项目运行时，禁止 curl/wget；
+- FirmHound 侧的 LLM 调用走项目运行时；FirmRec 上游如果启用 LLM，使用其自身
+  `config.yaml` 的 `llm_key/llm_url/llm_model`，不经过本项目运行时；
 - 只有 `poc_sanitized=true` 的 marker/crash 证据可确认候选。
 
 ## 6. CI 与验收

@@ -25,6 +25,7 @@ docs/
 | 交付前做一次完整自测 | [`guide/cli-testing.md`](guide/cli-testing.md) | doctor / plan / analyze / 降级 / 安全策略的验收标准 |
 | 理解外部分析器怎么编进流水线 | [`external/README.md`](external/README.md) | 固定编排顺序、开关、能力边界、诚实降级、安全红线 |
 | 准备外部工具的运行环境 | [`external/field-testing.md`](external/field-testing.md) | 硬件要求、镜像、四器逐个跑通步骤与踩坑 |
+| 不用 Docker 原生跑 FirmRec | [`guide/firmrec-native.md`](guide/firmrec-native.md) | JDK/Ghidra/PostgreSQL/Python 全栈、上游输入契约、`make firmrec-doctor` |
 | 查固件样本清单与来源 | [`external/dataset.md`](external/dataset.md) | L1/L2/L3 三档数据集、SHA256、架构、下载脚本 |
 | 接入/维护某个外部工具 | `skills/08-external-analyzers/<tool>/SKILL.md` | 目标 → 输入输出 → 执行流程 → 命令 → 验收降级 → 踩坑表 |
 | 查某个设计为什么这么做 | [`design/design-rationale.md`](design/design-rationale.md) | 关键取舍、边界、常见质疑的答法 |

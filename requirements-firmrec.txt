@@ -1,0 +1,32 @@
+# FirmRec native backend dependencies (upstream seclab-fudan/FirmRec).
+#
+# This file is NOT installed by `make dev` and must not be installed into the
+# FirmHound .venv: upstream pins are Python 3.9-era and conflict with the
+# project's Python 3.11+ environment. Create a dedicated env instead:
+#
+#   python3.9 -m venv .venv-firmrec
+#   .venv-firmrec/bin/pip install -r requirements-firmrec.txt
+#
+# Then point external.firmrec.python_bin (or FSA_FIRMREC_PYTHON_BIN) at it.
+
+angr==9.2.41
+capstone==4.0.2
+chardet==5.2.0
+lxml==4.9.2
+networkx==3.0
+openpyxl==3.1.2
+psycopg2-binary==2.9.5
+PyYAML==6.0
+rich==13.3.2
+numpy==1.24.2
+scipy==1.10.1
+black==23.3.0
+pytest==7.1.2
+pytest-xdist==3.2.1
+gprof2dot==2022.7.29
+graphviz==0.20.1
+ipython==8.11.0
+requests
+
+# Required by upstream extractor/extractor.py (not in upstream requirements.txt).
+python-magic

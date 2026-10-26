@@ -23,9 +23,12 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 
 ## 2. 适用场景 / 输入
 
-- **输入**：固件镜像（FirmRec 吃 `inout/firmware/images/`，本项目 `UNPACK` 产物是解包
-  rootfs，prepare 阶段把 rootfs 当 firmware 输入兜底）+ `inout/vuln_info/`（已知漏洞
-  签名）+ `inout/experiment.json`（任务表）。
+- **输入（上游真实契约）**：
+  - `inout/firmware/images/<VENDOR>/<IMAGE>`：固件镜像（不是解包后的 rootfs）；
+  - `inout/vuln_info/<VENDOR>/<NAME>/{meta.json, 漏洞固件}`：已知漏洞签名；
+  - `inout/experiment.json`：`{"name": ..., "vulns": [...], "images": [...]}`。
+  - 本项目 `UNPACK` 产物是 rootfs；只有 rootfs 时 `prepare()` 会打成 tar 作为近似
+    image，并写 `limitation`。真实签名提取应使用 `vuln_info_dir`/`official`。
 - **触发**：`EXTERNAL_ANALYSIS` 阶段，且 `config/dev.yaml` 中
   `external.firmrec.enabled=true`。**盲跑（blind=true）时由代码强制禁用**（见 §隔离）。
 - **不适用**：纯盲评 benchmark（会被强制关）；合成固件（x86，FirmRec 主打 MIPS/ARM）。
@@ -37,29 +40,43 @@ tags: [external, firmrec, recurrence, ccs24, m-external]
 - `runs/<id>/artifacts/external_findings/recurrence_findings.json`：**FirmRec 专属分流
   文件**，与主链 `fused.json` 完全分开。
 - 每条 finding 必含：`finding_id`、`tool=firmrec`、`binary_id`、`vuln_class`、
-  `sink`(function+addr)、`matched_cve`、`confidence`、`status`。
+  `sink`(function+addr)、`confidence`、`status`；单签名实验会带 `matched_cve`，
+  多签名实验不猜 CVE，只在 `notes` 记录 `vuln_refs`。
+- 上游结果来自 `inout/emu_results/result.csv`（部分版本为 `simexp_results/result.csv`），
+  解析器会依次搜索这些位置。
 
 ## 4. 执行流程
 
-1. **probe()**：检查 Docker daemon + `xylearn/firmrec-base` 镜像。**永不抛异常**；
-   缺失返回 `available=False + missing=[...]` → 整条链路 `skipped`。
-2. **prepare()**：在 `tmp/external/firmrec/<run_id>/` 建 `out/`、`logs/`、`inout/`
-   （firmware / vuln_info / experiment.json）。`vuln_info` 默认来自自建的 9-CVE 知识库
-   （`vuln_info_source: our`），官方样例走 `official`（占位，跑通官方样例后填真实 schema）。
-3. **run()**：容器内跑 `python -m firmrec.pipeline all`。PostgreSQL 须先经 `make start`
-   起来（FirmRec 的依赖），否则记 `limitation` 说明 PG 未就绪——不伪造成功。
-4. **parse()**：`tools/external/firmrec/parser.py` 容错解析三类产物：
-   - `VULNS.md` → 检出 CVE + 固件 + 二进制 + 函数 + 地址 + 相似度
-   - PostgreSQL `pg_*.csv`（容器内 `COPY ... TO STDOUT` 导出）→ 详细匹配行
-   - `poc_info/` → **必须经 `sanitize_poc` 脱敏**，危险 payload 直接丢弃
+1. **probe()**：按 `backend: auto | local | docker` 选择执行后端。**永不抛异常**。
+   - local：检查 `repo_dir`、`python_bin`、Ghidra headless、`firmrec-static.jar`，
+     并对 `repo_dir` 过路径白名单；缺失返 `available=False + missing=[...]`；
+   - docker：检查 daemon + `xylearn/firmrec-base` 镜像；
+   - 两种后端都要求至少一个可用的上游 `vuln_info` 条目，否则 skipped。
+2. **prepare()**：在 `tmp/external/firmrec/<run_id>/inout/` 生成上游真实目录：
+   `firmware/images/<VENDOR>/<IMAGE>`、`vuln_info/<VENDOR>/<NAME>/meta.json`、
+   `experiment.json`。只有 rootfs 时打 tar 并记 limitation。
+3. **run()**：
+   - local：用 FirmRec 专用 Python 执行 `native_wrapper.py`，先 `all` 再 `4.4`；
+     wrapper 在导入 `firmrec.consts` 前注入 per-run `gconfig`，不改上游 checkout；
+   - docker：在**同一个容器**内启动 PostgreSQL、跑 `all` 和 `4.4`（`--rm` 会销毁库）；
+   - PostgreSQL 未就绪、超时或失败都记 `limitation`，不伪造成功。
+4. **parse()**：优先解析上游 `inout/**/result.csv`（`emu_results`/`simexp_results`/
+   根目录都搜），字段归一化为 `external_finding`；旧版 `VULNS.md`/`pg_*.csv`/
+   `poc_info/` 作为兼容回退保留。
 5. **normalize()**：逐条过 schema 校验，非法 finding 丢弃并计数（`dropped`）。
 6. **execute()**：以上任一步异常都被兜住，返回 `status=skipped/failed`，**绝不 abort 主链**。
 
 ## 5. 命令与配置
 
 ```bash
+# 依赖检查（不跑分析）
+make firmrec-doctor
+
 # 调试：单工具独立跑（不经编排器）
 python scripts/run_external.py --tool firmrec --run-dir runs/<id>
+
+# 对已有 run 执行（Make 包装）
+make firmrec-smoke RUN_DIR=runs/<id>
 
 # 全量：整条外部链
 python scripts/run_external.py --tool all --run-dir runs/<id>
@@ -72,11 +89,20 @@ external:
   enabled: false
   firmrec:
     enabled: false
-    image: xylearn/firmrec-base
-    signature_db: ./benchmarks/CVEs     # 自建的 9-CVE 知识库
-    vuln_info_source: our               # our | official
-    mode: signature_only                # 盲跑禁止
-    sanitize_poc: true                  # 硬门：PoC 必须过脱敏才许落盘
+    backend: auto                 # auto | local | docker
+    repo_dir: ./vendor/FirmRec    # 本地上游 checkout
+    python_bin: ./.venv-firmrec/bin/python
+    ghidra_headless: /opt/ghidra/support/analyzeHeadless
+    firmrec_static_jar: ./vendor/FirmRec/firmentry/firmrec-static.jar
+    pg_user: root
+    pg_password: firmrec          # 或 FSA_FIRMREC_PG_PASSWORD
+    image: xylearn/firmrec-base   # Docker 回退
+    vuln_info_dir: ""             # 上游签名目录树（优先）
+    official_vuln_info_path: ""   # source=official
+    vuln_firmware_dir: ""         # source=our 的漏洞固件
+    signature_db: ./benchmarks/CVEs
+    vuln_info_source: our         # our | official
+    mode: signature_only          # 盲跑禁止
     timeout_s: 7200
 ```
 
@@ -97,8 +123,8 @@ external:
 - **融合层**：FirmRec findings 全部带 `matched_cve`，`finding_fusion` 把它们标
   `blind_isolated=True`、**不计入 `external_only` 增量**、并单独落 `recurrence_findings.json`，
   主链 `fused.json` 永不混入 FirmRec 条目（守零 CVE 先验红线）。
-- **报告层**：复发结论单列一章，开头明写「本节依赖已知漏洞签名，不属于零先验能力，
-  不计入 Blind Benchmark 指标」。
+- **报告层**：`report.md` 的「复发漏洞（FirmRec）」一节单列，开头明写
+  「本节依赖已知漏洞签名，不属于零先验能力，不计入 Blind Benchmark 指标」。
 - **下游**：FirmRec 检出的变体可反向喂给主轨做「已知变体特征」规则沉淀（限非盲场景）。
 
 ---
@@ -121,15 +147,16 @@ external:
 
 | 坑 | 症状 | 处理 |
 |---|---|---|
-| base 镜像巨大 | pull 30–60 分钟，磁盘 20G+ | 第一优先级拉；磁盘不够先清 `tmp/` |
-| PostgreSQL 起不来 | `make start` 后 `psql` 连不上 | 进容器手动 `service postgresql start`；查 `dataflow.conf` 与连接串 |
-| `make build` 后改动不生效 | 改了源码/config 容器里还是旧的 | 必须重跑 `make build` 把源码拷进新镜像 |
-| 没有 LLM key 跑不完整 | pipeline 走到入口搜索就停 | 配 `config.yaml` 的 `llm_key/url/model`（用国内备案端点）；不配也要跑，记录退化 |
-| `vuln_info` 格式不对 | pipeline 报找不到字段 | 先跑通官方样例，再照抄格式填自建的 9 CVE |
-| benchmark fixture 是抽象的 | `binary_id = bin-CVE-xxxx` 非真实路径 | 做映射表，明写推定字段（`vuln_info_mapping.md`） |
-| 容器内 curl 被拉黑 | 调模型失败 | 宿主机侧 Python 预取后写进 `inout/`，避开容器内网络调用 |
+| `repo_dir:path_whitelist` | 本地 checkout 被安全策略拒绝 | 直接 clone 到 `./vendor/FirmRec`（不要用符号链接），或把绝对路径加入 `config/safety.yaml` |
+| Python 版本不对 | angr/psycopg2 装不上 | 用 `make firmrec-deps FIRMREC_PYTHON=python3.9` 建独立 `.venv-firmrec` |
+| Ghidra/JAR 缺失 | `ghidra_headless` / `firmrec_static_jar` missing | 装 Ghidra 10.2.2，执行 `support/buildGhidraJar` 与 `firmentry/build_jar.sh` |
+| PostgreSQL 起不来 | `psql` 连不上 / peer auth | 启动服务、改 `pg_hba.conf` 为 `md5`、核对 `pg_user/pg_password` |
+| `vuln_info` 格式不对 | 上游找不到 `meta.json` | 用上游目录树 `vuln_info/<VENDOR>/<NAME>/meta.json`；旧的 `vulns.json` 已不再喂 upstream |
+| `our` 模式没有漏洞固件 | probe 报 `vuln_firmware_images` | 配置 `vuln_info_dir`/`official_vuln_info_path`，或在 `vuln_firmware_dir/<CVE>/` 放漏洞固件 |
+| `result.csv` 找不到 | 解析 0 条 | 确认 step 4.4 跑过；搜索 `emu_results/`、`simexp_results/`、`inout/result.csv` |
+| 只有 rootfs | 上游解包失败 | 允许 tar 兜底并记录 limitation；最好提供原始固件镜像 |
 | 合成固件是 x86 | FirmRec 主打 MIPS/ARM | 记录是否支持；不支持则 L1 不作为验收必需项（comparison 注明） |
-| 挂载失败 | `docker: invalid mount config` | 确认宿主路径存在、Docker 有权访问该目录；Linux 下无需路径翻译 |
+| Docker 回退失败 | 镜像/挂载/数据库 | 挂载点是 `/root/inout` 与 `/root/config.yaml`；同一容器内起 PG 并跑 `all`+`4.4` |
 | PoC 含危险 payload | 落盘即违规 | `poc_info` 全经 `sanitize_poc`，拒绝的直接丢弃（`dropped_unsafe` 计数） |
 
 ---

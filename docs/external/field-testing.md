@@ -2,7 +2,7 @@
 
 > 适用：在**有公网 egress + 足够资源**的真实机器上跑通四个外部分析器（今天新增的四个插件）。
 > 本文所有命令、配置键、产物路径均与代码实装一致（`config/dev.yaml`、`scripts/run_external.py`、`tools/external/*`）。
-> 背景：开发沙箱里四个工具代码层全部就绪（单元测试 339 通过、1 跳过），但真实运行被本机环境阻断（Docker 文件共享坏 / Ghidra 需 ≥16G / `down.tenda.com.cn` 被拦截），本指南就是把这批运行落成可执行步骤。
+> 背景：开发沙箱里四个工具代码层全部就绪（单元测试 375 通过、1 跳过），但真实运行被本机环境阻断（Docker 文件共享坏 / Ghidra 需 ≥16G / `down.tenda.com.cn` 被拦截），本指南就是把这批运行落成可执行步骤。
 
 ---
 
@@ -115,10 +115,20 @@ python scripts/run_external.py --tool satc --run-dir runs/r7000_full --config co
 
 ### 4.2 FirmRec（已知漏洞复发检测，旁路隔离）— F1/F2/F6
 
-**安装**
+**安装（推荐：原生，不用 Docker）**
+
+```bash
+# 1) 宿主依赖 + JDK18/Ghidra10.2.2/Maven/PostgreSQL 见 guide/firmrec-native.md
+# 2) FirmRec Python 3.9 环境
+make firmrec-deps FIRMREC_PYTHON=python3.9
+# 3) 检查
+make firmrec-doctor
+```
+
+Docker 回退：
+
 ```bash
 docker pull xylearn/firmrec-base
-# PostgreSQL 在容器内，首次需 make start（若起不来：docker exec 容器内 service postgresql start）
 ```
 
 **配置**
@@ -127,25 +137,44 @@ external:
   enabled: true
   firmrec:
     enabled: true
-    image: xylearn/firmrec-base
+    backend: auto                 # auto | local | docker
+    # 直接 clone 到 ./vendor/FirmRec；符号链接会被 resolve 到白名单外
+    repo_dir: ./vendor/FirmRec
+    python_bin: ./.venv-firmrec/bin/python
+    ghidra_headless: /opt/ghidra/support/analyzeHeadless
+    firmrec_static_jar: ./vendor/FirmRec/firmentry/firmrec-static.jar
+    pg_user: root
+    pg_password: firmrec
+    image: xylearn/firmrec-base   # Docker 回退
+    vuln_info_dir: ""             # 上游签名目录树（优先）
+    official_vuln_info_path: ""   # source=official 的上游目录
+    vuln_firmware_dir: ""         # source=our 的漏洞固件 <CVE>/<image>
     signature_db: ./benchmarks/CVEs
-    vuln_info_source: our      # our=9-CVE 知识库（vuln_info_dataset.json）；official=官方库
-    official_vuln_info_path: "" # source=official 时必须指向真实、非空的上游 JSON
+    vuln_info_source: our         # our 是 fixture 模式；真实检测用 official/vuln_info_dir
     mode: signature_only
     timeout_s: 7200
 ```
 
 **测试**
 ```bash
+make firmrec-doctor
+make firmrec-smoke RUN_DIR=runs/r7000_full
+# 或
 python scripts/run_external.py --tool firmrec --run-dir runs/r7000_full
 # 验收清单
-#  F1/F2：真实复发实验（9-CVE 签名 → 固件内检出变体）
+#  F1/F2：真实复发实验（上游 vuln_info 签名 → 固件内检出变体）
 #  F6：复发隔离验证 —— 产物只进 artifacts/external_findings/recurrence_findings.json，
 #      绝不进 unified_candidates.json / fused.json（盲跑时 config 层强制 FORCED_DISABLE）
 #  PoC 落盘必须 poc_sanitized=true
 ```
 
-**踩坑**：`make start` 后 `psql` 连不上 → 进容器 `service postgresql start`，查连接串。
+**产物**：上游写 `inout/emu_results/result.csv`（部分版本是 `simexp_results/result.csv`），
+FirmHound 解析后落 `artifacts/external_findings/firmrec.json`；只有 rootfs 时会打 tar
+兜底并记 limitation。
+
+**踩坑**：PostgreSQL 认证失败 → 改 `pg_hba.conf` 为 `md5`；`repo_dir` 不在白名单 →
+放到 `./vendor/FirmRec` 或加入 `config/safety.yaml`；Docker 回退必须在同一容器内起 PG
+并跑 `all` + `4.4`。
 
 ### 4.3 KLEE（符号执行剪枝）— F1/F2/F6/F9
 
@@ -258,7 +287,7 @@ python -m fsa.orchestrator.cli run --task-card <task_card.json>        # 或等�
 | KLEE | F1/F2 符号执行 / F6 剪枝+抽检 / F9 性能 | `symex.reachable`、`.ktest`、剪枝率统计 | 剪枝率>70% 触发 5 条抽检；ptr.err→overflow 强证据；无误删 |
 | BOND | H8 真实 fuzz | `validation.*`、脱敏 PoC、`benchmarks/external/bond/raw/` | authorized+私有网段+emulation 下成功触发 ≥1；unsafe 闸验证有效 |
 
-**跨工具回归**：四个工具各自跑完 + FUSION 全绿后，跑一次 `make test`（应 339 passed / 1 skipped），确认真实产物没有改变基准行为。
+**跨工具回归**：四个工具各自跑完 + FUSION 全绿后，跑一次 `make test`（应 375 passed / 1 skipped），确认真实产物没有改变基准行为。
 
 ---
 

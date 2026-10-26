@@ -13,6 +13,7 @@ Safety notes:
 from __future__ import annotations
 
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -54,13 +55,26 @@ def run_local(
     *,
     cwd: Path | None = None,
     timeout: float = 60.0,
+    env: dict[str, str] | None = None,
 ) -> BackendResult:
-    """Run a command on the host (Linux)."""
+    """Run a command on the host (Linux).
+
+    ``env`` is merged over the current environment by :func:`run_command`, which
+    lets callers pin ``LC_ALL=C`` or pass a PostgreSQL password without mutating
+    the parent process.
+    """
     if not cmd:
         return BackendResult("failed", stderr="empty command")
-    if shutil.which(cmd[0]) is None and not Path(cmd[0]).is_absolute():
+    executable = Path(cmd[0])
+    if executable.is_absolute():
+        if not executable.is_file():
+            return BackendResult("missing", stderr=f"executable not found: {cmd[0]}")
+    elif shutil.which(cmd[0]) is None:
         return BackendResult("missing", stderr=f"executable not found: {cmd[0]}")
-    return _from_run_result(run_command(cmd, cwd=cwd, timeout=timeout))
+    started = time.monotonic()
+    result = _from_run_result(run_command(cmd, cwd=cwd, timeout=timeout, env=env))
+    result.duration_s = round(time.monotonic() - started, 3)
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -120,7 +134,10 @@ def run_docker(
     full += list(extra_args or [])
     full += [image]
     full += [str(c) for c in cmd]
-    return _from_run_result(run_command(full, cwd=cwd, timeout=timeout))
+    started = time.monotonic()
+    result = _from_run_result(run_command(full, cwd=cwd, timeout=timeout))
+    result.duration_s = round(time.monotonic() - started, 3)
+    return result
 
 
 def run_container_cmd(
@@ -131,7 +148,10 @@ def run_container_cmd(
 ) -> BackendResult:
     """Execute a command inside an already-running container (``docker exec``)."""
     full = ["docker", "exec", container] + [str(c) for c in cmd]
-    return _from_run_result(run_command(full, timeout=timeout))
+    started = time.monotonic()
+    result = _from_run_result(run_command(full, timeout=timeout))
+    result.duration_s = round(time.monotonic() - started, 3)
+    return result
 
 
 BACKENDS: dict[str, Any] = {

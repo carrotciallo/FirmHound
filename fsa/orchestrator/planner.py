@@ -103,6 +103,7 @@ class Planner:
             "model": input_data.get("model"),
             "version": input_data.get("version"),
             "depth": input_data.get("depth", "standard"),
+            "blind": bool(input_data.get("blind", False)),
             "constraints": input_data.get("constraints", []),
             "attachments": [],
             "success_criteria": input_data.get(
