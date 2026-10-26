@@ -52,6 +52,18 @@ tools:
         top_k: {type: integer}
       required: [run_dir]
 
+  - name: tools.audit.agent_loop
+    module_path: tools.audit.agent_loop
+    function_name: execute_agent_loop
+    description: Run the bounded, evidence-driven AGENT_LOOP stage.
+    args_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        run_dir: {type: string}
+        config_path: {type: string}
+      required: [run_dir]
+
   - name: tools.emu.validate
     module_path: tools.emulation.validate
     function_name: execute_validation

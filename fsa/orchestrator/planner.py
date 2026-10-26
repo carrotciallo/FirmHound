@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from fsa.orchestrator.agent_options import resolve_agent_options
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import save_json
 
@@ -110,6 +111,13 @@ class Planner:
                 "success_criteria", ["identify high-confidence vulnerabilities"]
             ),
             "authorization": auth,
+            "agent": resolve_agent_options(
+                self.config.get("agent", {}),
+                input_data.get("agent"),
+                blind=bool(input_data.get("blind", False)),
+                allow_emulation=bool(auth.get("allow_emulation", False)),
+                external_enabled=bool(self.config.get("external", {}).get("enabled", False)),
+            ),
             "requires_human_gate": False,
             "human_gate_reasons": [],
         }
@@ -246,9 +254,16 @@ class Planner:
 
         config_path = self.config.get("_config_path")
         external_args = {"config_path": config_path} if config_path else {}
+        agent_cfg = task_card.get("agent", {})
+        if not isinstance(agent_cfg, dict):
+            agent_cfg = {}
+        if agent_cfg.get("enabled", False):
+            rank_index = stages.index("RANK") if "RANK" in stages else len(stages) - 1
+            stages.insert(rank_index + 1, "AGENT_LOOP")
 
         plan: dict[str, Any] = {
             "stages": stages,
+            "agent": agent_cfg,
             "stage_configs": {
                 "UNPACK": {
                     "tool": "tools.firmware.unpack",
@@ -296,6 +311,17 @@ class Planner:
                     "args": external_args,
                 },
                 "RANK": {"tool": "tools.audit.rank", "required": True},
+                **(
+                    {
+                        "AGENT_LOOP": {
+                            "tool": "tools.audit.agent_loop",
+                            "required": False,
+                            "args": external_args,
+                        }
+                    }
+                    if agent_cfg.get("enabled", False)
+                    else {}
+                ),
                 "VERIFY_TOP_K": {
                     "tool": "tools.audit.verify",
                     "required": True,

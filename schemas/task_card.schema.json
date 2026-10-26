@@ -41,7 +41,12 @@
     "blind": {
       "type": "boolean",
       "default": false,
-      "description": "Blind benchmark run; recurrence-only tools are force-disabled."
+      "description": "Blind benchmark run; recurrence-only tools and the agent loop are force-disabled."
+    },
+    "agent": {
+      "type": "object",
+      "description": "Effective bounded agent-loop options; see agent_options.schema.json.",
+      "additionalProperties": true
     },
     "constraints": {"type": "array", "items": {"type": "string"}},
     "success_criteria": {"type": "array", "items": {"type": "string"}},

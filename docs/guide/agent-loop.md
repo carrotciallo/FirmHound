@@ -1,0 +1,100 @@
+# 受控自主执行（AGENT_LOOP）
+
+`AGENT_LOOP` 是 `RANK` 与 `VERIFY_TOP_K` 之间的一个**可选**阶段。它只做一件事：
+针对候选的 `decisive_missing_fact`，从封闭动作目录中选择下一步取证动作，把事实
+补齐后再交给反证验证。
+
+它**不是**自由 Agent：模型不能生成工具名、路径、参数、shell 命令或漏洞结论；
+所有动作、参数和写入位置都由代码固定。
+
+## 启用
+
+```bash
+# 单次运行
+fsa analyze <rootfs> --input-type rootfs \
+  --authorization-holder "设备所有者" --agent --run-id hunt-agent
+
+# 只查看计划
+fsa plan --firmware-path <rootfs> --authorization-holder "设备所有者" --agent --json-output
+```
+
+或在 `config/dev.yaml`：
+
+```yaml
+agent:
+  enabled: true
+  tier: standard
+```
+
+默认关闭。`--no-agent` 可覆盖配置。Blind Run（`--blind`）无论配置如何都强制禁用。
+
+## 动作 tier
+
+| tier | 动作 | 前置条件 |
+|---|---|---|
+| `standard`（默认） | 调用链恢复、imports/strings 核对、startup 检查、证据引用核对、auth 解析、handler 映射 | 只读已有 rootfs/artifacts，无网络、无仿真 |
+| `dynamic` | `qemu_load_check`（L1 加载检查） | `--agent-tier dynamic`、`--allow-emulation`、`agent.dynamic.enabled=true`；只允许私网/本机 |
+| `external` | `klee_feasibility`（只消费已有 symex） | `--agent-tier external`、`external.enabled=true`、`agent.external.klee.enabled=true` |
+
+tier 不满足时自动降级到 `standard`，并在 trace/报告的 limitations 中说明。
+v1 不在 loop 内运行 BOND；BOND 仍在 `CONSTRAINED_VALIDATION` 阶段。
+
+## 预算
+
+| 参数 | 默认 | 含义 |
+|---|---|---|
+| `agent.max_candidates` | 10 | 最多检查多少个候选 |
+| `agent.max_steps` | 20 | 全局动作步数 |
+| `agent.max_steps_per_candidate` | 4 | 单候选动作步数 |
+| `agent.max_tool_calls` | 40 | 工具调用上限 |
+| `agent.max_seconds` | 120 | 墙钟上限 |
+| `agent.no_progress_limit` | 2 | 连续无进步后停滞该候选 |
+| `agent.max_action_failures` | 3 | 连续失败后停滞该候选 |
+
+对应 CLI 参数：`--agent-max-candidates`、`--agent-max-steps`、
+`--agent-max-steps-per-candidate`、`--agent-max-tool-calls`、
+`--agent-max-seconds`、`--agent-no-progress-limit`。
+
+## 模型参与
+
+默认 `agent.model.enabled: auto`：
+
+- runtime 是 `offline` 时，不调用模型，规则选择；
+- runtime 是 `openai_compatible` 时，模型只在 2–4 个合法动作里选一个；
+- 模型输出必须是严格 JSON：`{action_id, reason, confidence}`；
+- 未知动作、额外字段、markdown 围栏、越界 confidence、网络/主机策略拒绝、
+  超时或异常 → 自动回退规则选择。
+
+远程 endpoint 需要同时在 `config/safety.yaml` 的 `network.allowed_hosts` 中显式
+列出，并设置 `agent.model.allow_public: true`。本地 OpenAI-compatible 端点
+（如 `http://127.0.0.1:.../v1`）不需要放开公网。
+
+## 产物
+
+- `runs/<id>/artifacts/agent_trace.json`：通过 `agent_trace.schema.json` 校验；
+  记录候选、动作、选择者、证据 ID、预算、停止原因、limitations。
+- `runs/<id>/artifacts/ranking.json`：enrich 后重新评分排序。
+- `runs/<id>/evidence/ev-*.json`：`stage=AGENT_LOOP` 的确定性事实。
+- `runs/<id>/decisions/dec-*.json`：`actor=model|rule` 的动作选择记录。
+- `report.md` 第 24 节「自主分析轨迹」：只渲染计数和结论边界，不渲染模型原文。
+
+## 安全边界
+
+- 动作只能读取 run artifacts/rootfs，所有路径先过 `PolicyEngine.check_path`；
+- 模型只看到有界候选摘要，不发送固件内容、证据正文或 PoC；
+- 候选字符串按不可信输入处理，命中 `config/safety.yaml::model.forbidden_requests`
+  时直接回退规则；
+- Agent 不允许修改 `conclusion_category`、`status`、`risk_level`；最终结论仍由
+  `VERIFY_TOP_K` 产生；
+- Blind Run 强制禁用，避免模型先验泄漏。
+
+## 失败语义
+
+| 情况 | 行为 |
+|---|---|
+| 无 `ranking.json` / 无候选 | `skipped` + limitation |
+| 动作前置条件不满足 | 不选择；无动作时 `skipped` |
+| 调用链架构不支持 | `degraded` + limitation，不伪造 |
+| 模型失败 / 预算耗尽 | 回退规则或停止，trace 记录原因 |
+| 悬空证据引用 | 移除并记入 `evidence_unresolved` |
+| Agent 阶段失败 | `required=False`，主流程继续到 VERIFY/REPORT |

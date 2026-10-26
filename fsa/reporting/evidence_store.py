@@ -90,7 +90,11 @@ class EvidenceStore:
         return [item for item in self.list_all() if target_id in item.get("supports", [])]
 
     def next_id(self) -> str:
-        """Return the next sequential evidence id for simple append API."""
+        """Return the first free sequential evidence id for the append API."""
+        for index in range(1, len(self.list_all()) + 2):
+            candidate = f"ev-{index:04d}"
+            if not self.layout.evidence_path(candidate).exists():
+                return candidate
         return f"ev-{len(self.list_all()) + 1:04d}"
 
     def append(self, item: dict[str, Any]) -> dict[str, Any]:

@@ -18,6 +18,46 @@ analysis:
   max_strings_per_binary: 200
   verify_top_k: 5
 
+# --------------------------------------------------------------------------- #
+# Bounded agent loop (optional; disabled by default)
+#
+# The loop collects facts for existing candidates. The model may only rank the
+# rule-generated action list; it never supplies tool names, paths, parameters,
+# or conclusions. `tier=dynamic|external` is an explicit opt-in.
+# --------------------------------------------------------------------------- #
+agent:
+  enabled: false
+  tier: standard            # standard | dynamic | external
+  runtime: ""               # empty -> runtime.default
+  max_candidates: 10
+  max_steps: 20
+  max_steps_per_candidate: 4
+  max_tool_calls: 40
+  max_seconds: 120
+  no_progress_limit: 2
+  max_action_failures: 3
+  max_binary_size_mb: 64
+  model:
+    enabled: auto           # auto | true | false
+    max_calls: 8
+    max_tokens: 4000
+    allow_public: false
+  dynamic:
+    enabled: false
+    require_authorized_emulation: true
+    qemu_load_check:
+      timeout_s: 30
+  external:
+    enabled: false
+    klee:
+      enabled: false
+      max_time_s: 600
+      max_forks: 64
+      max_depth: 200
+      solver: z3
+    bond:
+      enabled: false        # reserved; v1 does not run BOND inside the loop
+
 safety:
   config: config/safety.yaml
   enforce: true

@@ -18,7 +18,7 @@ FirmHound 只依赖 Linux 原生工具链。x86_64 与 aarch64 都可以；glibc
 > Python ≤ 3.13，Python 3.14 会在 `pip install` 阶段报
 > `pyo3 ... requires Python <= 3.13` 一类错误。Fedora 44 等新发行版的默认 `python3`
 > 可能已经是 3.14，请显式安装/使用 Python 3.13，并执行
-> `make setup PYTHON=python3.13`。
+> `make dev PYTHON=python3.13 && make doctor`。
 
 ## 1. 依赖分三档
 
@@ -76,7 +76,7 @@ sudo dnf install -y \
 
 - Fedora 仓库里**没有** `sasquatch`，只能源码编译，见 §3。
 - Fedora 44+ 的默认 `python3` 可能是 3.14；请安装 `python3.13` 并用
-  `make setup PYTHON=python3.13`，否则依赖链里的 PyO3 扩展会报
+  `make dev PYTHON=python3.13 && make doctor`，否则依赖链里的 PyO3 扩展会报
   `requires Python <= 3.13`。
 - Fedora 40+ 的 `binwalk` 是 3.x（Rust 重写版），扫描更快，但解包仍然调用外部 `sasquatch` / `unsquashfs`，外部工具一个都不能少。
 - `squashfs-tools` 4.6.1 起自带 lzma 解码，`unsquashfs -s` 能读出 `Compression lzma` 的超级块。部分厂商镜像的 fragment table 仍会解崩，这类镜像需要 `sasquatch`。
@@ -97,7 +97,7 @@ sudo dnf install -y \
 需要注意的点：
 
 - `binwalk`、`p7zip`、`qemu-user-static` 都在 EPEL，先装 `epel-release`。RHEL 10 / CentOS Stream 10 起 7z 换成了 `7zip` 包，`p7zip` 装不到就换它。
-- RHEL 8 的默认 `python3` 是 3.6，太旧。装 `python3.11` 后用 `make setup PYTHON=python3.11`，或 `update-alternatives` 切换。
+- RHEL 8 的默认 `python3` 是 3.6，太旧。装 `python3.11` 后用 `make dev PYTHON=python3.11 && make doctor`，或 `update-alternatives` 切换。
 - 系统订阅未注册时 `dnf` 会直接报错，此时改用 Rocky / AlmaLinux 容器更方便。
 
 ### 2.4 Arch / Manjaro / EndeavourOS
@@ -115,7 +115,7 @@ yay -S --needed qemu-user-static sasquatch
 
 - `sasquatch` 与 `qemu-user-static` 都在 AUR，`pacman` 装不到，得用 `yay` / `paru`，或者走 §3 自己编译。
 - `binwalk` 若在当前镜像的仓库里找不到，用 `yay -S binwalk` 或 `pipx install binwalk`。
-- Arch 滚动更新频繁，升级后先 `make setup` 重建 venv，再跑 `make doctor`。
+- Arch 滚动更新频繁，升级后先 `make clean-venv && make dev` 重建 venv，再跑 `make doctor`。
 
 ### 2.5 openSUSE Leap / Tumbleweed
 
@@ -263,10 +263,11 @@ make -j"$(nproc)" && sudo make install
 ```bash
 git clone https://github.com/cyx-weimijiheheda/FirmHound.git
 cd FirmHound
-make setup
+make dev
+make doctor
 ```
 
-`make setup` 依次做四件事：建 `.venv`、装 `requirements.txt`、以 editable 方式装本项目、跑一次 `fsa doctor`。
+`make dev` 建 `.venv`、装 `requirements.txt`、以 editable 方式装本项目；`make doctor` 单独跑一次环境自检。
 
 手动等价写法：
 
@@ -283,7 +284,7 @@ python3.13 -m venv .venv
 pipx install .
 ```
 
-Python 解释器不在默认路径时用 `make setup PYTHON=python3.13`；请保持在 3.11–3.13
+Python 解释器不在默认路径时用 `make dev PYTHON=python3.13 && make doctor`；请保持在 3.11–3.13
 范围内，不要使用 3.14（PyO3 依赖尚未支持）。
 
 ## 5. 验证

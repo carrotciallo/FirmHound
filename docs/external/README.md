@@ -49,7 +49,7 @@ FirmRec 原生后端（不依赖 Docker）的完整安装见
 [`../guide/firmrec-native.md`](../guide/firmrec-native.md)：
 
 ```bash
-make firmrec-deps FIRMREC_PYTHON=python3.9   # 独立 .venv-firmrec
+FIRMREC_PYTHON=python3.9 python3 scripts/dev.py firmrec-deps   # 独立 .venv-firmrec
 make firmrec-doctor                          # 检查 repo/python/Ghidra/PostgreSQL
 make firmrec-smoke RUN_DIR=runs/<id>         # 对已有 run 执行
 ```

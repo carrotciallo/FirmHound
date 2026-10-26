@@ -38,7 +38,7 @@ fsa status <run-id> ; fsa resume <run-id>
 | 路径 | 职责 | 不要做的事 |
 |---|---|---|
 | `fsa/cli.py` | click 命令组，仅做参数解析与结果输出 | 不写业务逻辑 |
-| `fsa/orchestrator/` | 阶段机、任务卡、状态持久化、反证审查 | 不直接调用系统工具 |
+| `fsa/orchestrator/` | 阶段机、任务卡、状态持久化、反证审查、受控 Agent 循环 | 不直接调用系统工具 |
 | `fsa/runtime/` | 运行时适配（offline / openai_compatible）、工具注册表、Skill 加载 | 不伪造模型结论 |
 | `tools/` | 确定性分析工具（纯函数优先，可单测） | 不做流程编排 |
 | `schemas/` | 跨阶段数据契约 | 不绕过校验 |
@@ -62,7 +62,10 @@ fsa status <run-id> ; fsa resume <run-id>
    禁止生成"看起来合理"的模型结论、反编译结果或验证结论。
 5. **证据可追溯**：结论必须能指回 `evidence/ev-*.json`；候选必须带 `counterevidence`
    与 `decisive_missing_fact`。新增判断逻辑时同时写反证，而不只是加分证据。
-6. **幂等与续跑**：阶段产物写到 `runs/<run_id>/artifacts/`，已存在则覆盖为最新且可重复执行；
+6. **Agent 边界**：`AGENT_LOOP` 默认关闭；Blind Run 强制禁用；模型只能对规则筛选出的
+   合法动作排序/选择，不得生成工具名、路径、参数或漏洞结论；Agent 动作不得修改
+   `conclusion_category` / `status` / `risk_level`。
+7. **幂等与续跑**：阶段产物写到 `runs/<run_id>/artifacts/`，已存在则覆盖为最新且可重复执行；
    中断后 `fsa resume` 必须能从第一个未完成阶段继续。
 
 ## 4. 改动守则

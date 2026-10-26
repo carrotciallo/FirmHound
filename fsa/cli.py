@@ -53,6 +53,97 @@ def _status_from_checks(checks: dict[str, dict[str, Any]]) -> str:
     return "ok"
 
 
+def _agent_cli_options(func: Any) -> Any:
+    """Attach the shared bounded-agent options to ``plan`` and ``analyze``."""
+    options = [
+        click.option(
+            "--agent/--no-agent",
+            default=None,
+            help="Enable the bounded AGENT_LOOP stage; default comes from config.",
+        ),
+        click.option(
+            "--agent-tier",
+            type=click.Choice(["standard", "dynamic", "external"]),
+            default=None,
+            help="Maximum action tier (dynamic/external require explicit opt-in).",
+        ),
+        click.option(
+            "--agent-max-candidates", type=click.IntRange(1, 100), default=None
+        ),
+        click.option("--agent-max-steps", type=click.IntRange(1, 200), default=None),
+        click.option(
+            "--agent-max-steps-per-candidate",
+            type=click.IntRange(1, 20),
+            default=None,
+        ),
+        click.option(
+            "--agent-max-tool-calls", type=click.IntRange(1, 500), default=None
+        ),
+        click.option("--agent-max-seconds", type=click.IntRange(1, 3600), default=None),
+        click.option(
+            "--agent-no-progress-limit", type=click.IntRange(1, 10), default=None
+        ),
+        click.option(
+            "--agent-dynamic-timeout-s", type=click.IntRange(1, 300), default=None
+        ),
+        click.option(
+            "--agent-klee-max-time-s", type=click.IntRange(1, 14400), default=None
+        ),
+        click.option(
+            "--agent-klee-max-forks", type=click.IntRange(1, 1024), default=None
+        ),
+        click.option(
+            "--agent-klee-max-depth", type=click.IntRange(1, 1000), default=None
+        ),
+        click.option(
+            "--agent-klee-solver",
+            type=click.Choice(["z3", "stp"]),
+            default=None,
+        ),
+    ]
+    for option in reversed(options):
+        func = option(func)
+    return func
+
+
+def _agent_overrides(**values: Any) -> dict[str, Any]:
+    """Build a sparse override dict; ``None`` means 'use config/default'."""
+    overrides: dict[str, Any] = {}
+    if values.get("agent") is not None:
+        overrides["enabled"] = values["agent"]
+    if values.get("agent_tier") is not None:
+        overrides["tier"] = values["agent_tier"]
+    for key in (
+        "max_candidates",
+        "max_steps",
+        "max_steps_per_candidate",
+        "max_tool_calls",
+        "max_seconds",
+        "no_progress_limit",
+    ):
+        value = values.get(f"agent_{key}")
+        if value is not None:
+            overrides[key] = value
+    timeout = values.get("agent_dynamic_timeout_s")
+    if timeout is not None:
+        overrides.setdefault("dynamic", {}).setdefault("qemu_load_check", {})[
+            "timeout_s"
+        ] = timeout
+    klee: dict[str, Any] = {}
+    for cli_key, config_key in (
+        ("agent_klee_max_time_s", "max_time_s"),
+        ("agent_klee_max_forks", "max_forks"),
+        ("agent_klee_max_depth", "max_depth"),
+        ("agent_klee_solver", "solver"),
+    ):
+        value = values.get(cli_key)
+        if value is not None:
+            klee[config_key] = value
+    if klee:
+        overrides.setdefault("external", {}).setdefault("klee", {}).update(klee)
+    return overrides
+
+
 @click.group()
 @click.option(
     "--config",
@@ -107,6 +198,7 @@ def main(ctx: click.Context, config: Path) -> None:
     show_default=True,
     help="Blind benchmark run: recurrence-only tools are force-disabled.",
 )
+@_agent_cli_options
 @click.pass_context
 def plan(
     ctx: click.Context,
@@ -123,6 +215,19 @@ def plan(
     run_id: str | None,
     json_output: bool,
     blind: bool,
+    agent: bool | None,
+    agent_tier: str | None,
+    agent_max_candidates: int | None,
+    agent_max_steps: int | None,
+    agent_max_steps_per_candidate: int | None,
+    agent_max_tool_calls: int | None,
+    agent_max_seconds: int | None,
+    agent_no_progress_limit: int | None,
+    agent_dynamic_timeout_s: int | None,
+    agent_klee_max_time_s: int | None,
+    agent_klee_max_forks: int | None,
+    agent_klee_max_depth: int | None,
+    agent_klee_solver: str | None,
 ) -> None:
     """Parse a task and show the planned CLI execution stages without running tools."""
     if not any((task, task_package, firmware_path)):
@@ -149,6 +254,21 @@ def plan(
             "version": version,
             "depth": depth,
             "blind": blind,
+            "agent": _agent_overrides(
+                agent=agent,
+                agent_tier=agent_tier,
+                agent_max_candidates=agent_max_candidates,
+                agent_max_steps=agent_max_steps,
+                agent_max_steps_per_candidate=agent_max_steps_per_candidate,
+                agent_max_tool_calls=agent_max_tool_calls,
+                agent_max_seconds=agent_max_seconds,
+                agent_no_progress_limit=agent_no_progress_limit,
+                agent_dynamic_timeout_s=agent_dynamic_timeout_s,
+                agent_klee_max_time_s=agent_klee_max_time_s,
+                agent_klee_max_forks=agent_klee_max_forks,
+                agent_klee_max_depth=agent_klee_max_depth,
+                agent_klee_solver=agent_klee_solver,
+            ),
             "authorization": {
                 "holder": authorization_holder,
                 "scope": authorization_scope,
@@ -170,6 +290,14 @@ def plan(
             "firmware_path": task_card["firmware_path"],
             "depth": task_card["depth"],
             "blind": bool(task_card.get("blind", False)),
+            "agent": {
+                "enabled": bool(task_card.get("agent", {}).get("enabled", False)),
+                "tier": task_card.get("agent", {}).get("tier", "standard"),
+                "requested_tier": task_card.get("agent", {}).get(
+                    "requested_tier", "standard"
+                ),
+                "disabled_reason": task_card.get("agent", {}).get("disabled_reason"),
+            },
             "stages": execution_plan["stages"],
             "requires_human_gate": task_card["requires_human_gate"],
             "human_gate_reasons": task_card["human_gate_reasons"],
@@ -215,6 +343,7 @@ def plan(
     show_default=True,
     help="Blind benchmark run: recurrence-only tools are force-disabled.",
 )
+@_agent_cli_options
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -230,6 +359,19 @@ def analyze(
     run_id: str | None,
     json_output: bool,
     blind: bool,
+    agent: bool | None,
+    agent_tier: str | None,
+    agent_max_candidates: int | None,
+    agent_max_steps: int | None,
+    agent_max_steps_per_candidate: int | None,
+    agent_max_tool_calls: int | None,
+    agent_max_seconds: int | None,
+    agent_no_progress_limit: int | None,
+    agent_dynamic_timeout_s: int | None,
+    agent_klee_max_time_s: int | None,
+    agent_klee_max_forks: int | None,
+    agent_klee_max_depth: int | None,
+    agent_klee_solver: str | None,
 ) -> None:
     """Analyze firmware images or already extracted ROOTFS directories.
 
@@ -254,6 +396,21 @@ def analyze(
         "version": version,
         "run_id": run_id,
         "blind": blind,
+        "agent": _agent_overrides(
+            agent=agent,
+            agent_tier=agent_tier,
+            agent_max_candidates=agent_max_candidates,
+            agent_max_steps=agent_max_steps,
+            agent_max_steps_per_candidate=agent_max_steps_per_candidate,
+            agent_max_tool_calls=agent_max_tool_calls,
+            agent_max_seconds=agent_max_seconds,
+            agent_no_progress_limit=agent_no_progress_limit,
+            agent_dynamic_timeout_s=agent_dynamic_timeout_s,
+            agent_klee_max_time_s=agent_klee_max_time_s,
+            agent_klee_max_forks=agent_klee_max_forks,
+            agent_klee_max_depth=agent_klee_max_depth,
+            agent_klee_solver=agent_klee_solver,
+        ),
     }
 
     results = []
@@ -328,6 +485,7 @@ def _analyse_one(
             "version": options["version"],
             "depth": options["depth"],
             "blind": bool(options.get("blind", False)),
+            "agent": options.get("agent", {}),
             "authorization": {
                 "holder": options["authorization_holder"],
                 "scope": options["authorization_scope"],

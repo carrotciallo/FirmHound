@@ -78,7 +78,11 @@ class DecisionStore:
         return records
 
     def next_id(self) -> str:
-        """Return the next sequential decision id for simple append API."""
+        """Return the first free sequential decision id for the append API."""
+        for index in range(1, len(self.list_all()) + 2):
+            candidate = f"dec-{index:04d}"
+            if not self.layout.decision_path(candidate).exists():
+                return candidate
         return f"dec-{len(self.list_all()) + 1:04d}"
 
     def append(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -88,7 +92,7 @@ class DecisionStore:
         item.setdefault("observation", "")
         item.setdefault("next_stage", "")
         item.setdefault("inputs", [])
-        item.setdefault("actor", "orchestrator")
+        item.setdefault("actor", "rule")
         validate(item, schema_name="decision")
         save_json(self.layout.decision_path(decision_id), item)
         return item

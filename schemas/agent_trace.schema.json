@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/agent_trace.schema.json",
+  "title": "Agent Loop Trace",
+  "description": "Bounded, replayable trace of the optional AGENT_LOOP stage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "enabled",
+    "tier",
+    "status",
+    "started_at",
+    "finished_at",
+    "requested",
+    "disabled_reason",
+    "budget",
+    "model",
+    "candidates",
+    "steps",
+    "summary",
+    "limitations"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "enabled": {"type": "boolean"},
+    "tier": {"enum": ["standard", "dynamic", "external"]},
+    "status": {"enum": ["ok", "degraded", "partial", "skipped", "failed"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "tier", "source"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "tier": {"enum": ["standard", "dynamic", "external"]},
+        "source": {"type": "string"}
+      }
+    },
+    "disabled_reason": {"type": ["string", "null"]},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_candidates",
+        "max_steps",
+        "max_steps_per_candidate",
+        "max_tool_calls",
+        "max_seconds",
+        "used_candidates",
+        "used_steps",
+        "used_tool_calls",
+        "used_seconds",
+        "max_model_calls",
+        "used_model_calls",
+        "max_model_tokens",
+        "used_model_tokens"
+      ],
+      "properties": {
+        "max_candidates": {"type": "integer"},
+        "max_steps": {"type": "integer"},
+        "max_steps_per_candidate": {"type": "integer"},
+        "max_tool_calls": {"type": "integer"},
+        "max_seconds": {"type": "number"},
+        "used_candidates": {"type": "integer"},
+        "used_steps": {"type": "integer"},
+        "used_tool_calls": {"type": "integer"},
+        "used_seconds": {"type": "number"},
+        "max_model_calls": {"type": "integer"},
+        "used_model_calls": {"type": "integer"},
+        "max_model_tokens": {"type": "integer"},
+        "used_model_tokens": {"type": "integer"}
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "used",
+        "provider",
+        "model",
+        "calls",
+        "tokens",
+        "fallback_count",
+        "last_fallback_reason"
+      ],
+      "properties": {
+        "used": {"type": "boolean"},
+        "provider": {"type": "string"},
+        "model": {"type": "string"},
+        "calls": {"type": "integer"},
+        "tokens": {"type": "integer"},
+        "fallback_count": {"type": "integer"},
+        "last_fallback_reason": {"type": ["string", "null"]}
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "initial_missing_facts",
+          "final_missing_facts",
+          "actions_attempted",
+          "evidence_added",
+          "dangling_evidence",
+          "status",
+          "no_progress_streak"
+        ],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "initial_missing_facts": {"type": "array", "items": {"type": "string"}},
+          "final_missing_facts": {"type": "array", "items": {"type": "string"}},
+          "actions_attempted": {"type": "array", "items": {"type": "string"}},
+          "evidence_added": {"type": "array", "items": {"type": "string"}},
+          "dangling_evidence": {"type": "array", "items": {"type": "string"}},
+          "status": {"enum": ["ok", "degraded", "skipped", "stalled", "failed"]},
+          "no_progress_streak": {"type": "integer"}
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "candidate_id",
+          "missing_facts",
+          "eligible_actions",
+          "selected_action",
+          "selector",
+          "model_choice",
+          "status",
+          "produced_facts",
+          "evidence_ids",
+          "signature_before",
+          "signature_after",
+          "duration_ms",
+          "limitation"
+        ],
+        "properties": {
+          "step": {"type": "integer"},
+          "candidate_id": {"type": "string"},
+          "missing_facts": {"type": "array", "items": {"type": "string"}},
+          "eligible_actions": {"type": "array", "items": {"type": "string"}},
+          "selected_action": {"type": "string"},
+          "selector": {"enum": ["rule", "model"]},
+          "model_choice": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["action_id", "confidence", "reason"],
+            "properties": {
+              "action_id": {"type": "string"},
+              "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "reason": {"type": "string", "maxLength": 200}
+            }
+          },
+          "status": {"enum": ["ok", "degraded", "failed", "skipped"]},
+          "produced_facts": {"type": "array", "items": {"type": "string"}},
+          "evidence_ids": {"type": "array", "items": {"type": "string"}},
+          "signature_before": {"type": "string"},
+          "signature_after": {"type": "string"},
+          "duration_ms": {"type": "integer"},
+          "limitation": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stop_reason",
+        "steps",
+        "actions",
+        "evidence_added",
+        "resolved_candidates",
+        "stalled_candidates",
+        "skipped_candidates"
+      ],
+      "properties": {
+        "stop_reason": {"type": "string"},
+        "steps": {"type": "integer"},
+        "actions": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        },
+        "evidence_added": {"type": "integer"},
+        "resolved_candidates": {"type": "integer"},
+        "stalled_candidates": {"type": "integer"},
+        "skipped_candidates": {"type": "integer"}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

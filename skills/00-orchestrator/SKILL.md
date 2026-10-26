@@ -24,6 +24,7 @@ tags: [orchestrator, pipeline, m0, state-machine, planner]
 | DECOMPILE | 反编译（可选，非必须） | 反编译缓存 | Skill 03 |
 | STATIC_ANALYSIS | source→sink 数据流审计 | candidates.json | Skill 04 |
 | RANK | 十维风险评分排序 | ranking.json | `tools/analysis/risk_score.py` |
+| AGENT_LOOP | 可选、有界的自主取证循环；默认关闭，`--agent` 开启 | agent_trace.json + enriched ranking.json | Skill 09 / `fsa/orchestrator/agent_loop.py` |
 | VERIFY_TOP_K | 反证审查（10 问） | verdicts.json | Skill 05 / `verifier.py` |
 | LOCAL_VALIDATION | 本地动态验证（可选，full 深度） | dynamic_validation.json | Skill 06 |
 | REPORT | 双产物报告 + 合规扫描 | report.md / final_verdict.json | Skill 07 |
@@ -33,9 +34,13 @@ tags: [orchestrator, pipeline, m0, state-machine, planner]
 
 ```
 INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STATIC_ANALYSIS
-     → RANK → VERIFY_TOP_K → {REPORT | LOCAL_VALIDATION} → DONE
+     → RANK → [AGENT_LOOP] → VERIFY_TOP_K → {REPORT | LOCAL_VALIDATION} → DONE
 ```
 
+- `AGENT_LOOP` 仅在 `--agent` 或 `agent.enabled=true` 时插入；`required=False`，
+  失败/超时只降级。Blind Run 强制不插入。
+- Agent 只补齐 `call_chain`、startup、imports/strings、auth、证据引用等事实；
+  `conclusion_category` / `status` / `risk_level` 只能由 `VERIFY_TOP_K` 及后续阶段修改。
 - `VERIFY_TOP_K` 之后：有 `NEED_DYNAMIC` 候选且深度为 full → 走 `LOCAL_VALIDATION`，否则直通 `REPORT`。
 - `UNPACK` 部分失败（fallback）→ 跳到 `BINARY_TRIAGE`（无 rootfs 也能做 ELF 静态分析）。
 - 任意 required 阶段失败 → `ABORTED`，保留已完成阶段产物供 resume。
@@ -44,9 +49,11 @@ INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STA
 
 | depth | 阶段集 | budget_profile |
 |---|---|---|
-| `quick` | 跳过 DECOMPILE / LOCAL_VALIDATION | quick |
-| `standard`（默认） | 含 DECOMPILE，不含 LOCAL_VALIDATION | default |
-| `full` | 全部含 LOCAL_VALIDATION | default |
+| `quick` | 跳过 DECOMPILE / LOCAL_VALIDATION；`AGENT_LOOP` 仍可选 | quick |
+| `standard`（默认） | 含 DECOMPILE，不含 LOCAL_VALIDATION；`AGENT_LOOP` 可选 | default |
+| `full` | 全部含 LOCAL_VALIDATION；`AGENT_LOOP` 可选 | default |
+
+`AGENT_LOOP` 不随 depth 自动启用；必须显式 `--agent` 或配置 `agent.enabled=true`。
 
 任务卡缺口（缺 firmware_path / 缺授权人）→ `requires_human_gate=True`，进入 HumanGate 等待补全，不自动继续。
 
@@ -96,6 +103,8 @@ INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STA
 - 编排引擎本身是纯规则的（mock runtime 即可跑通）。
 - 需要 LLM 参与时配置 `config/models.yaml` 的 `openai_compatible` runtime（base_url / model / api_key_env），通过 `fsa.runtime.load_runtime("openai_compatible")` 加载。
 - Budget 硬约束：max_total_tokens / max_tokens_per_stage / max_model_calls_per_stage / max_total_duration_seconds，超限即停，防止失控调用。
+- 在 `AGENT_LOOP` 中，模型只对规则筛出的合法动作排序/选择；不得生成工具名、路径、
+  参数或漏洞结论。模型不可用、JSON 不合法、endpoint 被策略拒绝时一律回退规则选择。
 
 ## 失败降级路径
 
@@ -105,6 +114,8 @@ INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STA
 | UNPACK 部分失败（无 rootfs） | fallback 到 BINARY_TRIAGE，仅做 ELF 级分析 |
 | required 阶段 error | run 状态置 ABORTED，保留已完成产物 |
 | 模型 runtime 不可用 | 回退 mock 纯规则执行，不中断流水线 |
+| Agent 缺数据 / 预算耗尽 / 模型回退 | `AGENT_LOOP` 返回 `degraded/skipped` + limitation，不阻断 VERIFY/REPORT |
+| Blind Run 请求 Agent | 强制不插入阶段；trace 写 `disabled_reason=blind` |
 | 安全门 / 策略拦截 | 工具返回 status=unsafe，记录决策后跳过该调用 |
 | 动态验证被禁用或门不过 | LOCAL_VALIDATION → skipped，报告标 dynamic_skipped |
 | 中途断点 | resume() 从首个未完成阶段继续，不重跑已完成阶段 |

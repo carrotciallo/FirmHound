@@ -36,6 +36,7 @@ _SECTIONS = [
     "限制与待验证事实",
     "修复建议",
     "最终结论",
+    "自主分析轨迹",
 ]
 
 
@@ -118,6 +119,39 @@ def _false_positive_summary(
     }
 
 
+def _agent_summary(trace: dict[str, Any], *, requested: bool = False) -> str:
+    """Render the agent trace as counts only; never include raw model text."""
+    if not isinstance(trace, dict) or not trace:
+        if requested:
+            return (
+                "已启用但未产生 agent_trace.json；请查看阶段状态与 limitations，"
+                "漏洞结论仍由确定性阶段与反证审查产生。"
+            )
+        return "未启用（--agent 未开启）；漏洞结论仍由确定性阶段与反证审查产生。"
+    if trace.get("disabled_reason") == "blind":
+        return "Blind 运行强制禁用自主分析，避免模型先验泄漏。"
+    if not trace.get("enabled", False):
+        reason = trace.get("disabled_reason") or "未启用"
+        return f"未启用（{reason}）；漏洞结论仍由确定性阶段与反证审查产生。"
+    budget = trace.get("budget", {}) if isinstance(trace.get("budget"), dict) else {}
+    summary = trace.get("summary", {}) if isinstance(trace.get("summary"), dict) else {}
+    model = trace.get("model", {}) if isinstance(trace.get("model"), dict) else {}
+    unresolved = int(summary.get("skipped_candidates", 0)) + int(
+        summary.get("stalled_candidates", 0)
+    )
+    return (
+        f"检查候选：{budget.get('used_candidates', 0)}；"
+        f"步数：{summary.get('steps', 0)}；"
+        f"工具调用：{budget.get('used_tool_calls', 0)}；"
+        f"新增证据：{summary.get('evidence_added', 0)}；"
+        f"模型参与：{bool(model.get('used', False))}；"
+        f"模型回退：{model.get('fallback_count', 0)}；"
+        f"停止原因：{summary.get('stop_reason', 'unknown')}；"
+        f"未解决候选：{unresolved}。"
+        "模型仅参与动作选择，不参与漏洞结论。"
+    )
+
+
 def _section_body(
     title: str,
     task: dict[str, Any],
@@ -129,6 +163,7 @@ def _section_body(
     validation: dict[str, Any],
     external: dict[str, Any],
     recurrence: dict[str, Any],
+    agent_trace: dict[str, Any],
 ) -> str:
     inventory = binaries.get("inventory", {}) if isinstance(binaries, dict) else {}
     rows = binaries.get("summaries", []) if isinstance(binaries, dict) else []
@@ -188,6 +223,10 @@ def _section_body(
         "限制与待验证事实": "静态 source/sink 共存不等于数据流可达；缺少调用链的候选必须通过反编译或隔离动态验证。",
         "修复建议": "优先消除 Shell 调用，采用参数化 API；对网络输入执行白名单、长度和类型校验，并收紧预认证入口。",
         "最终结论": f"基于现有证据形成 {len(verdicts)} 条反证审查结论；未达到证据门槛的条目不声明为已确认漏洞。",
+        "自主分析轨迹": _agent_summary(
+            agent_trace,
+            requested=bool((task.get("agent") or {}).get("enabled", False)),
+        ),
     }
     return values[title]
 
@@ -204,6 +243,9 @@ def execute_report(run_dir: str) -> dict[str, Any]:
     validation = load_artifact(run, "local_validation.json", {})
     external = load_artifact(run, "external_findings/all.json", {})
     recurrence = load_artifact(run, "external_findings/recurrence_findings.json", {})
+    agent_trace = load_artifact(run, "agent_trace.json", {})
+    if not agent_trace and task.get("blind", False):
+        agent_trace = {"enabled": False, "disabled_reason": "blind"}
     validate(verdict, schema_name="verdict")
 
     lines = [f"# 固件安全智能体分析报告 — {run.name}", ""]
@@ -223,6 +265,7 @@ def execute_report(run_dir: str) -> dict[str, Any]:
                     validation,
                     external,
                     recurrence,
+                    agent_trace,
                 ),
                 "",
             ]

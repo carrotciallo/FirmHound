@@ -10,6 +10,13 @@
   "version": null,
   "depth": "full",
   "blind": false,
+  "agent": {
+    "enabled": false,
+    "tier": "standard",
+    "requested_tier": "standard",
+    "disabled_reason": "not requested",
+    "limitations": []
+  },
   "constraints": ["重点检查命令注入", "只做静态分析"],
   "success_criteria": [
     "输出攻击面枚举",

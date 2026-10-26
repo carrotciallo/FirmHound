@@ -17,19 +17,30 @@ class Budget:
     max_total_duration_seconds: int = 3600
     total_tokens_used: int = 0
     total_calls: int = 0
+    stage_tokens_used: int = 0
+    stage_calls_used: int = 0
+
+    def begin_stage(self) -> None:
+        """Reset per-stage counters at the start of a new stage."""
+        self.stage_tokens_used = 0
+        self.stage_calls_used = 0
 
     def can_spend(self, tokens: int, calls: int = 1) -> bool:
-        """Check if a proposed spend fits within remaining budget."""
+        """Check whether a proposed spend fits the cumulative and stage budgets."""
         if self.total_tokens_used + tokens > self.max_total_tokens:
             return False
-        if calls > self.max_model_calls_per_stage:
+        if self.stage_tokens_used + tokens > self.max_tokens_per_stage:
+            return False
+        if self.stage_calls_used + calls > self.max_model_calls_per_stage:
             return False
         return True
 
     def spend(self, tokens: int, calls: int = 1) -> None:
-        """Record spent tokens and calls."""
+        """Record spent tokens and calls against both cumulative and stage budgets."""
         self.total_tokens_used += tokens
         self.total_calls += calls
+        self.stage_tokens_used += tokens
+        self.stage_calls_used += calls
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -39,6 +50,8 @@ class Budget:
             "max_total_duration_seconds": self.max_total_duration_seconds,
             "total_tokens_used": self.total_tokens_used,
             "total_calls": self.total_calls,
+            "stage_tokens_used": self.stage_tokens_used,
+            "stage_calls_used": self.stage_calls_used,
         }
 
 
