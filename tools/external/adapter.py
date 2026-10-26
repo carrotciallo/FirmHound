@@ -39,14 +39,20 @@ EXTERNAL_TOOLS = ("satc", "firmrec", "klee", "bond")
 
 
 def _repo_config_path() -> Path:
-    return Path(__file__).resolve().parent.parent.parent / "config" / "dev.yaml"
+    from fsa.utils.config_files import resolve_config_file
+
+    return resolve_config_file(
+        Path(__file__).resolve().parent.parent.parent / "config" / "dev.yaml"
+    )
 
 
 def _load_global_external(config_path: str | None = None) -> dict[str, Any]:
     """Return the ``external:`` mapping from config, or ``{}`` if absent."""
+    from fsa.utils.config_files import resolve_config_file
+
     candidates: list[Path] = []
     if config_path:
-        candidates.append(Path(config_path))
+        candidates.append(resolve_config_file(config_path))
     candidates.append(_repo_config_path())
     for path in candidates:
         if not path.exists():

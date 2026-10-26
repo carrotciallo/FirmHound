@@ -21,10 +21,14 @@ def load_runtime(name: str, config: dict | None = None) -> AgentRuntime:
     """Factory: load a runtime by name from config/models.yaml."""
     from pathlib import Path
 
+    from fsa.utils.config_files import resolve_config_file
     from fsa.utils.jsonio import load_yaml
 
     if config is None:
-        config = load_yaml(Path(__file__).parent.parent.parent / "config" / "models.yaml")
+        config_path = resolve_config_file(
+            Path(__file__).parent.parent.parent / "config" / "models.yaml"
+        )
+        config = load_yaml(config_path)
 
     runtimes = config.get("runtimes", {})
     if name not in runtimes:

@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from fsa.utils.config_files import resolve_config_file
 from fsa.utils.netcheck import is_private_ip
 
 
@@ -48,7 +49,7 @@ class PolicyEngine:
         """Load policy from the default config/safety.yaml or a provided path."""
         if path is None:
             path = Path(__file__).parent.parent.parent / "config" / "safety.yaml"
-        return cls(path)
+        return cls(resolve_config_file(path))
 
     @staticmethod
     def _load(path: Path) -> Policy:

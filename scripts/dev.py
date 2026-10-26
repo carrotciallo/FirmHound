@@ -80,6 +80,17 @@ def run(cmd: list[str] | str, *, cwd: Path | None = None) -> int:
     return subprocess.call(cmd, shell=isinstance(cmd, str), cwd=cwd)
 
 
+def _ensure_local_configs() -> None:
+    """Create ignored local configs from tracked ``*.example.yaml`` templates."""
+    config_dir = REPO_ROOT / "config"
+    for stem in ("dev", "models", "safety"):
+        target = config_dir / f"{stem}.yaml"
+        example = config_dir / f"{stem}.example.yaml"
+        if not target.exists() and example.exists():
+            shutil.copy2(example, target)
+            _log("config_created", path=str(target), source=str(example))
+
+
 def cmd_help(args: argparse.Namespace) -> int:
     """Show help."""
     parser.print_help()
@@ -88,6 +99,7 @@ def cmd_help(args: argparse.Namespace) -> int:
 
 def cmd_venv(args: argparse.Namespace) -> int:
     """Create the project .venv when missing, after checking the Python version."""
+    _ensure_local_configs()
     venv_dir = REPO_ROOT / ".venv"
     venv_python = venv_dir / "bin" / "python"
     if venv_python.exists():
@@ -157,12 +169,14 @@ def cmd_firmrec_deps(args: argparse.Namespace) -> int:
 def cmd_install(args: argparse.Namespace) -> int:
     """Install production dependencies."""
     _require_venv("install")
+    _ensure_local_configs()
     return run([PYTHON, "-m", "pip", "install", "-r", "requirements.txt"], cwd=REPO_ROOT)
 
 
 def cmd_dev(args: argparse.Namespace) -> int:
     """Install editable package and dev dependencies."""
     _require_venv("dev")
+    _ensure_local_configs()
     rc = run([PYTHON, "-m", "pip", "install", "-r", "requirements.txt"], cwd=REPO_ROOT)
     if rc != 0:
         return rc

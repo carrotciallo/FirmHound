@@ -18,6 +18,7 @@ from fsa.runtime import AgentRuntime, Budget, load_runtime
 from fsa.runtime.base import ToolResult
 from fsa.runtime.tool_registry import ToolRegistry
 from fsa.safety.policy_engine import PolicyEngine
+from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_yaml
 
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -91,7 +92,7 @@ class Orchestrator:
         config_path: str | Path | None = None,
     ) -> None:
         repo_root = Path(__file__).resolve().parent.parent.parent
-        self.config_path = Path(config_path or repo_root / "config" / "dev.yaml").resolve()
+        self.config_path = resolve_config_file(config_path or repo_root / "config" / "dev.yaml")
         self.config = config or load_yaml(self.config_path)
         self.config["_config_path"] = str(self.config_path)
         config_base = (
@@ -168,7 +169,7 @@ class Orchestrator:
         return str(run_id)
 
     def _load_budget_cfg(self, profile: str) -> dict[str, int]:
-        models_path = Path(self.config["paths"]["models"])
+        models_path = resolve_config_file(self.config["paths"]["models"])
         models_cfg = load_yaml(models_path)
         budgets = models_cfg.get("budgets", {})
         cfg = budgets.get(profile, budgets.get("default", {}))

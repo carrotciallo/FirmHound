@@ -13,7 +13,7 @@ runtimes:
   openai_compatible:
     provider: openai
     base_url: https://api.deepseek.com/v1
-    model: deepseek-chat
+    model: deepseek-flash
     timeout: 60
     max_retries: 3
     # api_key loaded from env var OPENAI_API_KEY by default.

@@ -7,6 +7,7 @@ from typing import Any
 
 from fsa.orchestrator.agent_loop import run_agent_loop
 from fsa.orchestrator.agent_options import resolve_agent_options
+from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_yaml
 from tools.pipeline_context import load_task, run_path
 
@@ -14,7 +15,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def _load_config(config_path: str | None) -> dict[str, Any]:
-    path = Path(config_path).resolve() if config_path else _REPO_ROOT / "config" / "dev.yaml"
+    path = resolve_config_file(
+        config_path or _REPO_ROOT / "config" / "dev.yaml"
+    )
     config = load_yaml(path)
     base = path.parent.parent if path.parent.name == "config" else path.parent
     safety = config.setdefault("safety", {})

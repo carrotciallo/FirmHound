@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from fsa.orchestrator.engine import Orchestrator, validate_run_id
 from fsa.schemas.loader import validate_all_examples
 from fsa.utils import console
+from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_json, load_yaml
 from fsa.utils.platform_info import detect as detect_platform
 from fsa.utils.platform_info import hint_for
@@ -68,16 +69,16 @@ def _agent_cli_options(func: Any) -> Any:
             help="Maximum action tier (dynamic/external require explicit opt-in).",
         ),
         click.option(
-            "--agent-max-candidates", type=click.IntRange(1, 100), default=None
+            "--agent-max-candidates", type=click.IntRange(1, 500), default=None
         ),
-        click.option("--agent-max-steps", type=click.IntRange(1, 200), default=None),
+        click.option("--agent-max-steps", type=click.IntRange(1, 5000), default=None),
         click.option(
             "--agent-max-steps-per-candidate",
             type=click.IntRange(1, 20),
             default=None,
         ),
         click.option(
-            "--agent-max-tool-calls", type=click.IntRange(1, 500), default=None
+            "--agent-max-tool-calls", type=click.IntRange(1, 10000), default=None
         ),
         click.option("--agent-max-seconds", type=click.IntRange(1, 3600), default=None),
         click.option(
@@ -155,7 +156,7 @@ def _agent_overrides(**values: Any) -> dict[str, Any]:
 @click.pass_context
 def main(ctx: click.Context, config: Path) -> None:
     """FirmHound firmware-security agent CLI."""
-    config = config.resolve()
+    config = resolve_config_file(config)
     if not config.is_file():
         raise click.ClickException(f"configuration not found: {config}")
     load_dotenv(config.parent.parent / ".env")
@@ -632,7 +633,7 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
         "invalid_examples": [name for name, _ in schema_errors],
     }
 
-    models_cfg = load_yaml(config["paths"]["models"])
+    models_cfg = load_yaml(resolve_config_file(config["paths"]["models"]))
     runtime_name = config.get("runtime", {}).get("default", "")
     model_env = (
         models_cfg.get("runtimes", {})

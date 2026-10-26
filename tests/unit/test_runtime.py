@@ -12,12 +12,16 @@ from fsa.runtime import OfflineRuleRuntime, load_runtime
 from fsa.runtime.base import Budget, ModelReply
 from fsa.runtime.mock import MockRuntime
 from fsa.runtime.openai_compatible import OpenAICompatibleRuntime
+from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_yaml
 
 
 @pytest.fixture
 def models_config() -> dict[str, Any]:
-    return load_yaml(Path(__file__).parent.parent.parent / "config" / "models.yaml")
+    path = resolve_config_file(
+        Path(__file__).parent.parent.parent / "config" / "models.yaml"
+    )
+    return load_yaml(path)
 
 
 def test_load_mock_runtime(models_config: dict[str, Any]) -> None:
@@ -33,7 +37,8 @@ def test_load_offline_runtime(models_config: dict[str, Any]) -> None:
 def test_load_openai_runtime(models_config: dict[str, Any]) -> None:
     rt = load_runtime("openai_compatible", models_config)
     assert isinstance(rt, OpenAICompatibleRuntime)
-    assert rt.model == "deepseek-chat"
+    expected = models_config["runtimes"]["openai_compatible"]["model"]
+    assert rt.model == expected
 
 
 def test_mock_ask_model() -> None:

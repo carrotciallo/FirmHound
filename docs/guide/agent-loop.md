@@ -55,6 +55,57 @@ v1 不在 loop 内运行 BOND；BOND 仍在 `CONSTRAINED_VALIDATION` 阶段。
 `--agent-max-steps-per-candidate`、`--agent-max-tool-calls`、
 `--agent-max-seconds`、`--agent-no-progress-limit`。
 
+## AI 服务配置
+
+模型服务分三层，不要全部塞进 `config/dev.yaml`：
+
+| 内容 | 文件 |
+|---|---|
+| 服务地址、模型名、超时、密钥环境变量名 | `config/models.yaml` 的 `runtimes.openai_compatible` |
+| 实际密钥 | 项目根 `.env`，变量名由 `api_key_env` 指定（默认 `OPENAI_API_KEY`） |
+| 是否启用、用哪个 runtime、Agent 预算 | `config/dev.yaml`：`runtime.default` / `agent.runtime` / `agent.model.*` |
+
+```yaml
+# config/models.yaml
+runtimes:
+  openai_compatible:
+    provider: openai
+    base_url: https://api.deepseek.com/v1   # 本地端点可写 http://127.0.0.1:11434/v1
+    model: deepseek-chat
+    timeout: 60
+    max_retries: 3
+    api_key_env: OPENAI_API_KEY
+```
+
+```bash
+# 项目根目录 .env（不要提交）
+OPENAI_API_KEY=sk-xxx
+```
+
+```yaml
+# config/dev.yaml
+runtime:
+  default: openai_compatible      # 全局默认 runtime
+agent:
+  runtime: ""                     # 空 -> runtime.default；也可单独指定
+  model:
+    enabled: auto                 # auto | true | false
+    max_calls: 8
+    max_tokens: 4000
+    allow_public: false
+```
+
+注意：
+
+- `offline` / `mock` runtime 不调用模型，`AGENT_LOOP` 自动走规则选择。
+- 远程 endpoint 除 `agent.model.allow_public: true` 外，还必须把主机名加入
+  `config/safety.yaml` 的 `network.allowed_hosts`；`127.0.0.1` / `localhost` 不需要。
+- `load_runtime()` 读取仓库根目录的 `config/models.yaml`；`paths.models` 目前只用于
+  `doctor`，不随 `--config` 切换。自定义配置时请改仓库根的同名文件。
+- `.env` 不提交；`.env.example` 只是模板。
+- `config/dev.yaml` / `models.yaml` / `safety.yaml` 是本地配置，已被 `.gitignore` 忽略；
+  `make dev` 会从 `config/*.example.yaml` 复制。缺失时代码也会自动回退到 example。
+
 ## 模型参与
 
 默认 `agent.model.enabled: auto`：

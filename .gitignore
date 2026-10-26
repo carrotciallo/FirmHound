@@ -16,6 +16,10 @@ venv/
 .env/
 .env
 
+# Local configuration (tracked templates are *.example.yaml)
+config/*.yaml
+!config/*.example.yaml
+
 # External tool checkouts (FirmRec native backend)
 vendor/
 

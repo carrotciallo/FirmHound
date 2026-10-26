@@ -29,10 +29,10 @@
     "tier": {"enum": ["standard", "dynamic", "external"]},
     "requested_tier": {"enum": ["standard", "dynamic", "external"]},
     "runtime": {"type": "string"},
-    "max_candidates": {"type": "integer", "minimum": 1, "maximum": 100},
-    "max_steps": {"type": "integer", "minimum": 1, "maximum": 200},
+    "max_candidates": {"type": "integer", "minimum": 1, "maximum": 500},
+    "max_steps": {"type": "integer", "minimum": 1, "maximum": 5000},
     "max_steps_per_candidate": {"type": "integer", "minimum": 1, "maximum": 20},
-    "max_tool_calls": {"type": "integer", "minimum": 1, "maximum": 500},
+    "max_tool_calls": {"type": "integer", "minimum": 1, "maximum": 10000},
     "max_seconds": {"type": "integer", "minimum": 1, "maximum": 3600},
     "no_progress_limit": {"type": "integer", "minimum": 1, "maximum": 10},
     "max_action_failures": {"type": "integer", "minimum": 1, "maximum": 10},
@@ -45,8 +45,8 @@
       "required": ["enabled", "max_calls", "max_tokens", "allow_public"],
       "properties": {
         "enabled": {"enum": [true, false, "auto"]},
-        "max_calls": {"type": "integer", "minimum": 1, "maximum": 100},
-        "max_tokens": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_calls": {"type": "integer", "minimum": 1, "maximum": 2000},
+        "max_tokens": {"type": "integer", "minimum": 1, "maximum": 2000000},
         "allow_public": {"type": "boolean"}
       }
     },

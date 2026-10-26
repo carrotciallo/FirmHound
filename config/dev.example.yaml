@@ -41,7 +41,7 @@ agent:
     enabled: auto           # auto | true | false
     max_calls: 8
     max_tokens: 4000
-    allow_public: false
+    allow_public: false     # set true only for an explicitly allowed remote endpoint
   dynamic:
     enabled: false
     require_authorized_emulation: true

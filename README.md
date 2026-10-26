@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-423%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-426%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -69,7 +69,7 @@
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，423 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，426 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -287,12 +287,15 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 
 ## 配置说明
 
-| 文件 | 作用 | 默认即用？ |
+| 文件 | 作用 | 说明 |
 |---|---|---|
-| `config/dev.yaml` | 主配置：runtime / 路径 / 日志 | ✅ |
-| `config/models.yaml` | 模型运行时（offline / openai_compatible）与预算 | ✅（offline 默认） |
-| `config/safety.yaml` | 安全红线（路径白名单 / 命令黑名单 / 网络白名单） | ✅（**不要改**） |
-| `.env` | 模型 API Key 等环境变量（参考 `.env.example`） | 可选 |
+| `config/dev.example.yaml` | 主配置模板：runtime / 路径 / 日志 / agent | ✅ 跟踪在 git |
+| `config/models.example.yaml` | 模型运行时与预算模板 | ✅ 跟踪在 git |
+| `config/safety.example.yaml` | 安全红线模板（路径 / 命令 / 网络白名单） | ✅ 跟踪在 git |
+| `config/dev.yaml` / `models.yaml` / `safety.yaml` | 本地实际配置 | `make dev` 从模板复制；已被 `.gitignore` 忽略 |
+| `.env` | 模型 API Key 等环境变量（参考 `.env.example`） | 已被 `.gitignore` 忽略 |
+
+本地配置不存在时，代码会自动回退到同名的 `*.example.yaml`；用 `make dev` 会自动创建本地副本。
 
 **启用 LLM 运行时**（可选，默认离线）：
 

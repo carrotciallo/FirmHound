@@ -267,7 +267,10 @@ make dev
 make doctor
 ```
 
-`make dev` 建 `.venv`、装 `requirements.txt`、以 editable 方式装本项目；`make doctor` 单独跑一次环境自检。
+`make dev` 建 `.venv`、装 `requirements.txt`、以 editable 方式装本项目，并从
+`config/*.example.yaml` 复制出本地 `config/dev.yaml`、`config/models.yaml`、
+`config/safety.yaml`；`make doctor` 单独跑一次环境自检。本地配置已被
+`.gitignore` 忽略，你的模型地址、预算和安全白名单修改不会进提交。
 
 手动等价写法：
 
