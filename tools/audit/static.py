@@ -10,36 +10,10 @@ from fsa.reporting.evidence_store import EvidenceStore
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import save_json
 from tools.analysis.source_sink_rules import match_binary
+from tools.audit.audit_constants import CHAIN_SINKS as _CHAIN_SINKS
+from tools.audit.audit_constants import KIND_BY_API as _KIND_BY_API
 from tools.binary.call_chain import recover_chains
 from tools.pipeline_context import load_artifact, run_path, save_artifact
-
-# Sink imports worth recovering an actual call site for (ARM32 disassembly).
-_CHAIN_SINKS = {
-    "doSystemCmd",
-    "system",
-    "popen",
-    "execve",
-    "sprintf",
-    "vsprintf",
-    "strcpy",
-    "strncpy",
-    "memcpy",
-    "strcat",
-    "snprintf",
-}
-
-# API name -> verifier-recognised validation kind (mirrors source_sink rules).
-_KIND_BY_API = {
-    "strlen": "length_check",
-    "strncmp": "whitelist",
-    "strcmp": "whitelist",
-    "atoi": "type_limit",
-    "strtol": "type_limit",
-    "strtoul": "type_limit",
-    "strtok": "blacklist",
-    "isalpha": "charset_check",
-    "isdigit": "charset_check",
-}
 
 _chain_cache: dict[str, dict[str, Any]] = {}
 
@@ -57,6 +31,8 @@ def _enrich_with_chain(
     rootfs: str,
     evidence_store: EvidenceStore,
     run_id: str,
+    *,
+    stage: str = "DECOMPILE_FALLBACK",
 ) -> None:
     """Attach a disassembly-backed call chain when one exists for this sink.
 
@@ -114,7 +90,7 @@ def _enrich_with_chain(
             ]
         evidence_id = evidence_store.add(
             run_id=run_id,
-            stage="DECOMPILE_FALLBACK",
+            stage=stage,
             type="decompile",
             observation=(
                 f"ARM32 disassembly: function sub_{func_addr:x} calls {sink_func} "

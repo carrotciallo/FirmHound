@@ -65,9 +65,11 @@ def test_report_handles_int_findings_and_renders_recurrence(tmp_path: Path) -> N
     result = execute_report(str(run))
 
     assert result["status"] == "ok"
-    assert result["section_count"] == 23
+    assert result["section_count"] == 24
     report = (run / "report.md").read_text(encoding="utf-8")
-    assert report.count("\n## ") == 23
+    assert report.count("\n## ") == 24
+    assert "自主分析轨迹" in report
+    assert "未启用" in report
     assert "规范化外部发现：3" in report
     assert "satc=ok" in report
     assert "复发发现：1 条" in report

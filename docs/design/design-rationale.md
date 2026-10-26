@@ -6,7 +6,9 @@
 
 面向 IoT 固件漏洞挖掘的 CLI 流水线。输入是厂商固件镜像，输出是带证据和反证的候选清单。解包、攻击面恢复、二进制审计、风险评分、反证验证、动态验证、报告生成都在同一个阶段机里跑：状态可恢复，产物可审计，缺工具时降级。
 
-大模型是可选件。默认 offline 运行；接入模型只用于任务理解和报告措辞，不参与漏洞判定。
+大模型是可选件。默认 offline 运行；接入模型只用于任务理解、动作排序和报告措辞，
+不参与漏洞判定。`AGENT_LOOP` 中模型只在规则筛出的合法动作里选择一个，动作本身由
+确定性工具执行，结论仍由反证验证器裁决。
 
 ## 2. 不该当作差异点的说法
 
@@ -73,6 +75,19 @@ sasquatch 非标准格式、gzip 噪声抑制、空目录误判、符号链接�
 
 FirmRec 只用于复发专项。Blind Run 由代码断言禁用，并在决策日志写 `FORCED_DISABLE`；
 结果落 `recurrence_findings.json`，不进 `unified_candidates.json`。
+
+### 3.7 受控自主执行（AGENT_LOOP）
+
+在 `RANK` 与 `VERIFY_TOP_K` 之间可选插入一个有界循环：规则先按候选的
+`decisive_missing_fact` 筛出合法动作；模型只在 2–4 个动作里排序/选择一个；动作由
+确定性工具执行，只补齐调用链、startup、imports/strings、auth、证据引用等事实。
+模型不生成工具名、路径、参数或结论，Agent 也不能修改
+`conclusion_category` / `status` / `risk_level`。
+
+默认关闭，`--agent` 或 `agent.enabled=true` 才启用；Blind Run 强制禁用；`standard`
+tier 不联网、不仿真；`dynamic` / `external` 需要显式参数。每次动作写
+`decisions/dec-*.json`，轨迹写 `artifacts/agent_trace.json`，报告第 24 节只渲染计数，
+不渲染模型原文。
 
 ## 4. 定位表述的几种写法
 
@@ -374,7 +389,7 @@ fsa analyze encrypted.bin --decrypt-profile tenda-be3lpro
 
 ### Q1：它和普通 Agent + 工具调用有什么区别？
 
-A：普通 Agent 的风险是自由发挥、结论不可复核。FirmHound 用阶段机把固件分析拆成可验证步骤，每一步都有 Schema 产物、证据 ID、决策记录和失败状态；模型只做辅助，判断依据来自证据链。
+A：普通 Agent 的风险是自由发挥、结论不可复核。FirmHound 用阶段机把固件分析拆成可验证步骤，每一步都有 Schema 产物、证据 ID、决策记录和失败状态；可选的 `AGENT_LOOP` 也只从封闭动作目录里选下一步取证动作，动作由确定性工具执行，模型不参与漏洞判定。
 
 ### Q2：是否把已知 CVE 当作答案库？
 
@@ -390,7 +405,7 @@ A：算能力边界，不算失败。系统识别出 OpenSSL Salted 加密载荷
 
 ### Q5：不接大模型还能运行吗？
 
-A：可以。FirmHound 默认 offline runtime，核心分析由确定性工具链完成。这样能避免模型不可用或幻觉影响漏洞结论；接入自建或企业 AI 网关后，可以增强任务理解和报告辅助，但不会替代证据门槛。
+A：可以。FirmHound 默认 offline runtime，核心分析由确定性工具链完成。这样能避免模型不可用或幻觉影响漏洞结论；接入自建或企业 AI 网关后，可以增强任务理解、动作排序和报告辅助，但不会替代证据门槛。`AGENT_LOOP` 在 offline 下自动回退规则选择，仍然可以运行。
 
 ## 11. 推荐定位表述
 

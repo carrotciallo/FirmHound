@@ -68,6 +68,35 @@ def test_budget_enforcement() -> None:
     assert budget.can_spend(10) is False
 
 
+def test_budget_uses_cumulative_calls_and_stage_reset() -> None:
+    budget = Budget(
+        max_total_tokens=1000,
+        max_tokens_per_stage=100,
+        max_model_calls_per_stage=2,
+    )
+    assert budget.can_spend(40)
+    budget.spend(40)
+    assert budget.can_spend(40)
+    budget.spend(40)
+    assert budget.stage_tokens_used == 80
+    assert budget.can_spend(20, calls=0)
+    assert not budget.can_spend(21, calls=0)
+    # Third call in the same stage is rejected by the cumulative call counter.
+    assert not budget.can_spend(0, calls=1)
+    budget.begin_stage()
+    assert budget.stage_tokens_used == 0
+    assert budget.stage_calls_used == 0
+    assert budget.can_spend(0, calls=1)
+
+
+def test_budget_rejects_stage_token_overflow() -> None:
+    budget = Budget(max_total_tokens=1000, max_tokens_per_stage=10)
+    budget.spend(10)
+    assert not budget.can_spend(1)
+    budget.begin_stage()
+    assert budget.can_spend(1)
+
+
 def test_openai_runtime_without_key() -> None:
     os.environ.pop("OPENAI_API_KEY", None)
     rt = OpenAICompatibleRuntime({"base_url": "http://localhost:8000/v1", "model": "test"})

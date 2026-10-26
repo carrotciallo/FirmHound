@@ -24,13 +24,14 @@ tags: [report, verdict, compliance, m10, redaction]
 - `dynamic_validation.json`（M8，可选）
 - `artifacts/external_findings/fused.json`、`recurrence_findings.json`、
   `unified_candidates.json`（外部轨，可选）
+- `artifacts/agent_trace.json`（自主分析轨迹，可选）
 
 ## 输出
 
-- `report.md`：固定 23 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
+- `report.md`：固定 24 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
 - `final_verdict.json`：`{run_id, firmware_sha256, findings:[...], stats:{...}}`
 
-## 报告 23 节固定骨架
+## 报告 24 节固定骨架
 
 1. 执行摘要
 2. 任务与授权范围
@@ -55,6 +56,7 @@ tags: [report, verdict, compliance, m10, redaction]
 21. 限制与待验证事实
 22. 修复建议
 23. 最终结论
+24. 自主分析轨迹
 
 ## 执行流程
 
@@ -81,7 +83,12 @@ tags: [report, verdict, compliance, m10, redaction]
    - `NEED_DYNAMIC` 但安全门不过 → 标注 `dynamic_skipped` 及原因，不虚构验证结果。
 
 6. **双产物写出**
-   - `report.md` 用固定 23 节模板渲染；`final_verdict.json` 通过 `verdict.schema.json` 校验。
+   - `report.md` 用固定 24 节模板渲染；`final_verdict.json` 通过 `verdict.schema.json` 校验。
+
+7. **自主分析轨迹**
+   - 只渲染计数：候选数、步数、工具调用、新增证据、模型参与/回退、停止原因、未解决候选。
+   - 固定写明「模型仅参与动作选择，不参与漏洞结论」。
+   - 不渲染模型原始回复、思维链或候选正文；Blind 运行写「强制禁用」。
 
 ## 失败降级路径
 
@@ -93,9 +100,11 @@ tags: [report, verdict, compliance, m10, redaction]
 | 证据索引缺失 | 「证据链与可追溯性」一节标「证据索引不完整」，不阻断报告 |
 | 外部工具缺失/超时 | 「外部分析器结果」一节写 `degraded` 与 limitation；主报告继续生成 |
 | FirmRec 在 Blind Run 被请求 | 强制 `skipped/FORCED_DISABLE`，只报告隔离事实，不渲染已知 CVE 结果 |
+| Agent 未启用 / Blind | 第 24 节写「未启用」或「Blind 强制禁用」，不阻断报告 |
+| agent_trace 缺失或损坏 | 第 24 节降级说明，不阻断报告 |
 
 ## 验收标准
 
-- 对任一 run 生成报告：23 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
+- 对任一 run 生成报告：24 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
 - 报告中不出现任何可复现攻击参数（脱敏后）。
 - 全部 REJECT 场景如实输出「未发现强证据」。

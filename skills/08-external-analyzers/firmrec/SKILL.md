@@ -148,7 +148,7 @@ external:
 | 坑 | 症状 | 处理 |
 |---|---|---|
 | `repo_dir:path_whitelist` | 本地 checkout 被安全策略拒绝 | 直接 clone 到 `./vendor/FirmRec`（不要用符号链接），或把绝对路径加入 `config/safety.yaml` |
-| Python 版本不对 | angr/psycopg2 装不上 | 用 `make firmrec-deps FIRMREC_PYTHON=python3.9` 建独立 `.venv-firmrec` |
+| Python 版本不对 | angr/psycopg2 装不上 | 用 `FIRMREC_PYTHON=python3.9 python3 scripts/dev.py firmrec-deps` 建独立 `.venv-firmrec` |
 | Ghidra/JAR 缺失 | `ghidra_headless` / `firmrec_static_jar` missing | 装 Ghidra 10.2.2，执行 `support/buildGhidraJar` 与 `firmentry/build_jar.sh` |
 | PostgreSQL 起不来 | `psql` 连不上 / peer auth | 启动服务、改 `pg_hba.conf` 为 `md5`、核对 `pg_user/pg_password` |
 | `vuln_info` 格式不对 | 上游找不到 `meta.json` | 用上游目录树 `vuln_info/<VENDOR>/<NAME>/meta.json`；旧的 `vulns.json` 已不再喂 upstream |

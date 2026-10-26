@@ -41,6 +41,7 @@ class Stage(str, Enum):
     DECOMPILE = "DECOMPILE"
     STATIC_ANALYSIS = "STATIC_ANALYSIS"
     RANK = "RANK"
+    AGENT_LOOP = "AGENT_LOOP"
     VERIFY_TOP_K = "VERIFY_TOP_K"
     LOCAL_VALIDATION = "LOCAL_VALIDATION"
     # External-analyzer track (all required=False -> degrades, never aborts).
@@ -66,6 +67,7 @@ TRANSITIONS: dict[str, tuple[str, str | None]] = {
     Stage.FUSION.value: (Stage.SYMEX_PRUNE.value, Stage.RANK.value),
     Stage.SYMEX_PRUNE.value: (Stage.RANK.value, Stage.RANK.value),
     Stage.RANK.value: (Stage.VERIFY_TOP_K.value, None),
+    Stage.AGENT_LOOP.value: (Stage.VERIFY_TOP_K.value, None),
     Stage.VERIFY_TOP_K.value: (Stage.LOCAL_VALIDATION.value, None),
     Stage.LOCAL_VALIDATION.value: (
         Stage.CONSTRAINED_VALIDATION.value,

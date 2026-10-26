@@ -20,7 +20,7 @@
 FirmRec 的 Python 依赖**不要**装进 FirmHound 的 `.venv`；用独立环境：
 
 ```bash
-make firmrec-deps FIRMREC_PYTHON=python3.9
+FIRMREC_PYTHON=python3.9 python3 scripts/dev.py firmrec-deps
 # 等价于：
 python3.9 -m venv .venv-firmrec
 .venv-firmrec/bin/pip install -r requirements-firmrec.txt
@@ -246,7 +246,7 @@ fsa analyze <rootfs> --input-type rootfs \
 | 症状 | 处理 |
 |---|---|
 | `repo_dir:path_whitelist` | 把 checkout 放到 `./vendor` 或加入 `config/safety.yaml` |
-| `python_bin` 缺失 | 用 `make firmrec-deps FIRMREC_PYTHON=python3.9` |
+| `python_bin` 缺失 | 用 `FIRMREC_PYTHON=python3.9 python3 scripts/dev.py firmrec-deps` |
 | `ghidra_headless` 缺失 | 安装 Ghidra 10.2.2 并执行 `support/buildGhidraJar` |
 | `firmrec_static_jar` 缺失 | 重新执行 `firmentry/build_jar.sh` |
 | PostgreSQL 认证失败 | 改 `pg_hba.conf` 为 `md5`，确认 `pg_user/pg_password` |

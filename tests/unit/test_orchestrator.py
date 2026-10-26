@@ -125,6 +125,54 @@ def test_build_plan_depths(planner: Planner) -> None:
     )
 
 
+def test_agent_stage_is_opt_in(planner: Planner) -> None:
+    card = planner.parse_task(
+        {
+            "task_id": "agent-plan",
+            "firmware_path": "/tmp/fw.bin",
+            "depth": "standard",
+            "authorization": "owner",
+            "agent": {"enabled": True},
+        }
+    )
+    plan = planner.build_plan(card)
+    assert "AGENT_LOOP" in plan["stages"]
+    assert plan["stages"].index("AGENT_LOOP") == plan["stages"].index("RANK") + 1
+    assert plan["stage_configs"]["AGENT_LOOP"]["required"] is False
+    assert plan["agent"]["enabled"] is True
+
+
+def test_agent_stage_defaults_off(planner: Planner) -> None:
+    card = planner.parse_task(
+        {
+            "task_id": "no-agent",
+            "firmware_path": "/tmp/fw.bin",
+            "depth": "standard",
+            "authorization": "owner",
+        }
+    )
+    plan = planner.build_plan(card)
+    assert "AGENT_LOOP" not in plan["stages"]
+    assert plan["agent"]["enabled"] is False
+
+
+def test_blind_forces_agent_off(planner: Planner) -> None:
+    card = planner.parse_task(
+        {
+            "task_id": "blind-agent",
+            "firmware_path": "/tmp/fw.bin",
+            "depth": "full",
+            "authorization": "owner",
+            "blind": True,
+            "agent": {"enabled": True},
+        }
+    )
+    plan = planner.build_plan(card)
+    assert "AGENT_LOOP" not in plan["stages"]
+    assert card["agent"]["disabled_reason"] == "blind"
+    assert card["agent"]["enabled"] is False
+
+
 def test_state_manager_lifecycle(tmp_path: Path) -> None:
     sm = StateManager(tmp_path / "run-001")
     state = sm.init({"task_id": "run-001"}, {"stages": ["A", "B"]})

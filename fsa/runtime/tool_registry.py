@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import jsonschema
 import yaml
 
 from fsa.runtime.base import ToolResult
@@ -77,8 +78,24 @@ class ToolRegistry:
         return self._tools[name]
 
     def call(self, name: str, args: dict[str, Any]) -> ToolResult:
-        """Resolve and execute a tool, enforcing safety policy."""
+        """Resolve and execute a tool, enforcing arguments and safety policy."""
         spec = self.get(name)
+
+        if spec.args_schema:
+            try:
+                jsonschema.validate(args, spec.args_schema)
+            except jsonschema.ValidationError as exc:
+                return ToolResult(
+                    status="error",
+                    output={"status": "failed", "reason": f"invalid arguments: {exc.message}"},
+                    stderr=f"invalid arguments for {name}: {exc.message}",
+                )
+            except jsonschema.SchemaError as exc:
+                return ToolResult(
+                    status="error",
+                    output={"status": "failed", "reason": f"invalid args_schema: {exc.message}"},
+                    stderr=f"invalid args_schema for {name}: {exc.message}",
+                )
 
         # Safety gate for commands.
         if "command" in args:

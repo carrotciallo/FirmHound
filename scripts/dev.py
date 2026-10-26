@@ -5,6 +5,7 @@ Usage:
 
 Commands:
     help          Show this help message
+    venv          Create the project .venv if missing
     install       Install production dependencies
     dev           Install package in editable mode with dev dependencies
     test          Run deterministic unit tests
@@ -12,6 +13,8 @@ Commands:
     integration   Run host integration tests only
     ext-smoke     Probe all four optional external analyzers
     firmrec-doctor Probe the FirmRec native/Docker backend
+    firmrec-venv  Create the optional FirmRec Python 3.9 environment
+    firmrec-deps  Install optional FirmRec Python dependencies
     firmrec-smoke Run FirmRec against an existing run directory
     lint          Run ruff check
     format        Run ruff format
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -80,6 +84,74 @@ def cmd_help(args: argparse.Namespace) -> int:
     """Show help."""
     parser.print_help()
     return 0
+
+
+def cmd_venv(args: argparse.Namespace) -> int:
+    """Create the project .venv when missing, after checking the Python version."""
+    venv_dir = REPO_ROOT / ".venv"
+    venv_python = venv_dir / "bin" / "python"
+    if venv_python.exists():
+        _log("venv_ready", path=str(venv_dir))
+        return 0
+    if not (3, 11) <= sys.version_info[:2] <= (3, 13):
+        _log(
+            "unsupported_python",
+            action="venv",
+            version=sys.version.split()[0],
+            supported="3.11-3.13",
+            hint="use `make dev PYTHON=python3.13`",
+        )
+        return 1
+    rc = run([sys.executable, "-m", "venv", str(venv_dir)], cwd=REPO_ROOT)
+    if rc != 0:
+        _log("venv_failed", hint="install the venv module for this Python")
+        return rc
+    return run(
+        [str(venv_python), "-m", "pip", "install", "-q", "--upgrade", "pip"],
+        cwd=REPO_ROOT,
+    )
+
+
+def _firmrec_venv() -> tuple[Path | None, int]:
+    """Create the optional FirmRec Python 3.9 environment; return (python, rc)."""
+    python_bin = os.environ.get("FIRMREC_PYTHON", "python3.9")
+    raw_venv = Path(os.environ.get("FIRMREC_VENV", ".venv-firmrec"))
+    venv_dir = raw_venv if raw_venv.is_absolute() else REPO_ROOT / raw_venv
+    venv_python = venv_dir / "bin" / "python"
+    if venv_python.exists():
+        return venv_python, 0
+    if shutil.which(python_bin) is None:
+        _log(
+            "firmrec_python_missing",
+            python=python_bin,
+            hint="set FIRMREC_PYTHON to a Python 3.9 interpreter",
+        )
+        return None, 1
+    rc = run([python_bin, "-m", "venv", str(venv_dir)], cwd=REPO_ROOT)
+    if rc != 0:
+        return None, rc
+    rc = run(
+        [str(venv_python), "-m", "pip", "install", "-q", "--upgrade", "pip"],
+        cwd=REPO_ROOT,
+    )
+    return venv_python, rc
+
+
+def cmd_firmrec_venv(args: argparse.Namespace) -> int:
+    """Create the optional FirmRec Python environment."""
+    _python, rc = _firmrec_venv()
+    return rc
+
+
+def cmd_firmrec_deps(args: argparse.Namespace) -> int:
+    """Install the optional FirmRec Python dependencies."""
+    venv_python, rc = _firmrec_venv()
+    if venv_python is None:
+        return rc
+    return run(
+        [str(venv_python), "-m", "pip", "install", "-r", "requirements-firmrec.txt"],
+        cwd=REPO_ROOT,
+    )
 
 
 def cmd_install(args: argparse.Namespace) -> int:
@@ -169,6 +241,9 @@ def cmd_firmrec_doctor(args: argparse.Namespace) -> int:
 
 def cmd_firmrec_smoke(args: argparse.Namespace) -> int:
     """Run FirmRec against an existing run directory."""
+    if not args.run_dir:
+        _log("missing_run_dir", hint="pass --run-dir runs/<id>")
+        return 1
     from tools.external.adapter import run_firmrec
 
     result = run_firmrec(args.run_dir)
@@ -264,6 +339,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("help", help="Show this help message")
+    sub.add_parser("venv", help="Create the project .venv if missing")
     sub.add_parser("install", help="Install production dependencies")
     sub.add_parser("dev", help="Install editable package and dev dependencies")
     sub.add_parser("test", help="Run deterministic unit tests with pytest")
@@ -271,6 +347,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("integration", help="Run host integration tests")
     sub.add_parser("ext-smoke", help="Probe optional external analyzers")
     sub.add_parser("firmrec-doctor", help="Probe the FirmRec native/Docker backend")
+    sub.add_parser("firmrec-venv", help="Create the optional FirmRec Python 3.9 env")
+    sub.add_parser("firmrec-deps", help="Install optional FirmRec Python dependencies")
     firmrec_smoke = sub.add_parser(
         "firmrec-smoke", help="Run FirmRec against an existing run directory"
     )
@@ -283,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     handlers = {
         "help": cmd_help,
+        "venv": cmd_venv,
         "install": cmd_install,
         "dev": cmd_dev,
         "test": cmd_test,
@@ -290,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         "integration": cmd_integration,
         "ext-smoke": cmd_ext_smoke,
         "firmrec-doctor": cmd_firmrec_doctor,
+        "firmrec-venv": cmd_firmrec_venv,
+        "firmrec-deps": cmd_firmrec_deps,
         "firmrec-smoke": cmd_firmrec_smoke,
         "lint": cmd_lint,
         "format": cmd_format,

@@ -1,0 +1,38 @@
+{
+  "enabled": false,
+  "tier": "standard",
+  "requested_tier": "standard",
+  "runtime": "",
+  "max_candidates": 10,
+  "max_steps": 20,
+  "max_steps_per_candidate": 4,
+  "max_tool_calls": 40,
+  "max_seconds": 120,
+  "no_progress_limit": 2,
+  "max_action_failures": 3,
+  "max_binary_size_mb": 64,
+  "disabled_reason": "not requested",
+  "limitations": [],
+  "model": {
+    "enabled": "auto",
+    "max_calls": 8,
+    "max_tokens": 4000,
+    "allow_public": false
+  },
+  "dynamic": {
+    "enabled": false,
+    "require_authorized_emulation": true,
+    "qemu_load_check": {"timeout_s": 30}
+  },
+  "external": {
+    "enabled": false,
+    "klee": {
+      "enabled": false,
+      "max_time_s": 600,
+      "max_forks": 64,
+      "max_depth": 200,
+      "solver": "z3"
+    },
+    "bond": {"enabled": false}
+  }
+}

@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-375%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-423%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -19,28 +19,32 @@
 
 ## 目录
 
-- [项目简介](#项目简介)
-- [核心特性](#核心特性)
-- [快速开始（60 秒）](#快速开始60-秒)
-- [系统架构](#系统架构)
-- [环境配置（Linux）](#环境配置linux)
-- [拿到固件后怎么做（完整流程）](#拿到固件后怎么做完整流程)
-  - [第 1 步 · 放置固件](#第-1-步--放置固件)
-  - [第 2 步 · 解包固件](#第-2-步--解包固件)
-  - [第 3 步 · 静态分析](#第-3-步--静态分析)
-  - [第 4 步 · 解读报告](#第-4-步--解读报告)
-  - [第 5 步 · 人工审计（10 问）](#第-5-步--人工审计10-问)
-  - [第 6 步 · 动态验证（可选）](#第-6-步--动态验证可选)
-- [CLI 命令参考](#cli-命令参考)
-- [配置说明](#配置说明)
-- [项目结构](#项目结构)
-- [Skill 体系](#skill-体系)
-- [评分与结论模型](#评分与结论模型)
-- [安全与合规](#安全与合规)
-- [测试](#测试)
-- [常见问题（FAQ）](#常见问题faq)
-- [文档导航](#文档导航)
-- [许可证](#许可证)
+- [FirmHound 固件猎犬](#firmhound-固件猎犬)
+  - [目录](#目录)
+  - [项目简介](#项目简介)
+  - [核心特性](#核心特性)
+  - [快速开始（60 秒）](#快速开始60-秒)
+  - [系统架构](#系统架构)
+  - [环境配置（Linux）](#环境配置linux)
+  - [拿到固件后怎么做（完整流程）](#拿到固件后怎么做完整流程)
+    - [第 1 步 · 放置固件](#第-1-步--放置固件)
+    - [第 2 步 · 解包固件](#第-2-步--解包固件)
+    - [第 3 步 · 静态分析](#第-3-步--静态分析)
+    - [第 4 步 · 解读报告](#第-4-步--解读报告)
+    - [第 5 步 · 人工审计（10 问）](#第-5-步--人工审计10-问)
+    - [第 6 步 · 动态验证（可选）](#第-6-步--动态验证可选)
+  - [CLI 命令参考](#cli-命令参考)
+  - [配置说明](#配置说明)
+  - [项目结构](#项目结构)
+  - [Skill 体系](#skill-体系)
+  - [外部分析器双轨链](#外部分析器双轨链)
+  - [受控自主执行](#受控自主执行)
+  - [评分与结论模型](#评分与结论模型)
+  - [安全与合规](#安全与合规)
+  - [测试](#测试)
+  - [常见问题（FAQ）](#常见问题faq)
+  - [文档导航](#文档导航)
+  - [许可证](#许可证)
 
 ---
 
@@ -63,8 +67,9 @@
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
-| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 23 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，375 项单元测试持续守护 |
+| 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
+| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，423 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -129,8 +134,8 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
 每个发行版的具体命令、包名差异、`sasquatch` 编译与排错表都在那一份文档里。
 
 ```bash
-make setup     # 建 .venv + 装依赖 + editable 安装 + 跑一次自检
-make doctor    # 单独检查环境：路径、Schema、运行时、缺失工具
+make dev       # 建 .venv + 装依赖 + editable 安装
+make doctor    # 检查环境：路径、Schema、运行时、缺失工具
 ```
 
 `fsa doctor` 会打印当前 `distro` / `package_manager` / `libc`，缺工具时按你的发行版给出安装提示；
@@ -262,7 +267,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 |---|---|---|
 | `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
 | `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
-| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具 | `runs/<run-id>/` 全量证据、状态、报告 |
+| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind] [--agent] [--agent-tier standard\|dynamic\|external]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具与 Agent；`--agent` 开启有界自主取证 | `runs/<run-id>/` 全量证据、状态、报告、`agent_trace.json` |
 | `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
@@ -272,7 +277,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `make test-all` | 单元测试 + 主机相关集成测试 | — |
 | `make ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
 | `make firmrec-doctor` | 检查 FirmRec 原生/Docker 后端依赖 | readiness JSON |
-| `make firmrec-deps FIRMREC_PYTHON=python3.9` | 建 FirmRec 专用 Python 环境并装上游依赖 | `.venv-firmrec/` |
+| `python3 scripts/dev.py firmrec-deps` | 建 FirmRec 专用 Python 环境并装上游依赖（`FIRMREC_PYTHON` 可选） | `.venv-firmrec/` |
 | `make firmrec-smoke RUN_DIR=runs/<id>` | 对已有 run 执行 FirmRec | `artifacts/external_findings/firmrec.json` |
 | `make lint` | ruff 代码检查 | — |
 | `make format` | 自动格式化 | — |
@@ -339,8 +344,9 @@ export OPENAI_API_KEY=sk-xxx
 | 04-audit | 静态审计 | 数据流模型、七层模板、误报五规则；子技能 command-injection / buffer-overflow |
 | 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定 |
 | 06-dynamic-validation | 动态验证 | L0–L3 分层、qemu-user 三大坑、安全门 |
-| 07-report | 报告生成 | 23 节骨架、8 项合规扫描、脱敏 |
+| 07-report | 报告生成 | 24 节骨架、8 项合规扫描、脱敏 |
 | 08-external-analyzers | 双轨外部分析 | SaTC/FirmRec/KLEE/BOND、汇聚、降级与先验隔离 |
+| 09-agent-loop | 受控自主执行 | 封闭动作目录、缺失事实驱动、预算与安全边界 |
 
 ## 外部分析器双轨链
 
@@ -353,6 +359,18 @@ RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描�
 `backend: auto | local | docker`，原生安装（不用 Docker）见
 [`docs/guide/firmrec-native.md`](docs/guide/firmrec-native.md)；只有 rootfs 时会打 tar
 兜底并在报告中记 limitation。安装、能力边界和复现状态见 `docs/external/README.md`。
+
+## 受控自主执行
+
+`--agent` 在 `RANK` 与 `VERIFY_TOP_K` 之间插入可选的 `AGENT_LOOP`。规则先按候选的
+`decisive_missing_fact` 筛出 2–4 个合法动作；模型只在其中排序/选择一个，输出必须过
+严格 JSON Schema 与白名单；模型不可用或输出不合法时回退规则。动作只采集事实
+（调用链、startup、imports/strings、auth、证据引用），不修改
+`conclusion_category` / `status` / `risk_level`，最终裁决仍由反证验证器产生。
+
+默认关闭；Blind Run 强制禁用；`standard` tier 不联网、不仿真；`dynamic` / `external`
+需要显式参数。产物为 `artifacts/agent_trace.json` 与报告第 24 节。详见
+[`docs/guide/agent-loop.md`](docs/guide/agent-loop.md)。
 
 ## 评分与结论模型
 
@@ -414,6 +432,7 @@ make lint      # ruff 全绿
 | 按发行版装好依赖 | [`docs/guide/install.md`](docs/guide/install.md)（六类发行版的命令、sasquatch 编译、排错表） |
 | 在 Linux 上从零部署并录制演示 | [`docs/guide/deployment.md`](docs/guide/deployment.md)（含 7 个演示脚本与常见问题） |
 | 用 CLI 从固件挖到漏洞 | [`docs/guide/hunting-workflow.md`](docs/guide/hunting-workflow.md)（选目标 → 解包 → 分析 → 10 问审计） |
+| 开启/约束自主取证循环 | [`docs/guide/agent-loop.md`](docs/guide/agent-loop.md)（tier、预算、模型回退、安全边界） |
 | 提交前跑一遍自测 | [`docs/guide/cli-testing.md`](docs/guide/cli-testing.md) |
 | 接入 SaTC / FirmRec / KLEE / BOND | [`docs/external/README.md`](docs/external/README.md)（编排、开关、降级边界） |
 | 准备外部工具的机器与固件 | [`docs/external/field-testing.md`](docs/external/field-testing.md) + [`dataset.md`](docs/external/dataset.md) |
@@ -423,7 +442,7 @@ make lint      # ruff 全绿
 
 ## 许可证
 
-MIT © FirmHound Contributors
+MIT © [FirmHound Contributors](https://github.com/KimLee-12138/FirmHound-CLI/graphs/contributors) & [weimijiheheda](https://github.com/cyx-weimijiheheda)
 
 ---
 

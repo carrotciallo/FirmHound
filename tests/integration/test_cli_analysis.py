@@ -107,8 +107,9 @@ def test_cli_analyze_rootfs_reaches_done(depth: str) -> None:
         assert load_json(run / "artifacts" / "binary_summaries.json")["summaries"]
         assert load_json(run / "artifacts" / "candidates.json")["candidates"]
         assert load_json(run / "artifacts" / "verdict.json")["verdicts"]
-        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 23
+        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 24
         assert "误报控制摘要" in (run / "report.md").read_text(encoding="utf-8")
+        assert "自主分析轨迹" in (run / "report.md").read_text(encoding="utf-8")
         assert (run / "final_verdict.json").is_file()
         stats = load_json(run / "final_verdict.json")["stats"]
         assert "false_positive_control" in stats

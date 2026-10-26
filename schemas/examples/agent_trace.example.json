@@ -1,0 +1,50 @@
+{
+  "run_id": "run-20260817-001",
+  "enabled": false,
+  "tier": "standard",
+  "status": "skipped",
+  "started_at": "2026-08-17T10:00:00Z",
+  "finished_at": "2026-08-17T10:00:00Z",
+  "requested": {
+    "enabled": false,
+    "tier": "standard",
+    "source": "task_card"
+  },
+  "disabled_reason": "not requested",
+  "budget": {
+    "max_candidates": 10,
+    "max_steps": 20,
+    "max_steps_per_candidate": 4,
+    "max_tool_calls": 40,
+    "max_seconds": 120,
+    "used_candidates": 0,
+    "used_steps": 0,
+    "used_tool_calls": 0,
+    "used_seconds": 0,
+    "max_model_calls": 8,
+    "used_model_calls": 0,
+    "max_model_tokens": 4000,
+    "used_model_tokens": 0
+  },
+  "model": {
+    "used": false,
+    "provider": "offline",
+    "model": "",
+    "calls": 0,
+    "tokens": 0,
+    "fallback_count": 0,
+    "last_fallback_reason": null
+  },
+  "candidates": [],
+  "steps": [],
+  "summary": {
+    "stop_reason": "agent disabled",
+    "steps": 0,
+    "actions": {},
+    "evidence_added": 0,
+    "resolved_candidates": 0,
+    "stalled_candidates": 0,
+    "skipped_candidates": 0
+  },
+  "limitations": []
+}
