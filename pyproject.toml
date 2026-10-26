@@ -7,7 +7,8 @@ name = "fsa"
 version = "0.1.0"
 description = "FirmHound (固件猎犬): Firmware Security Agent for AI-assisted vulnerability discovery in IoT firmware."
 readme = "README.md"
-requires-python = ">=3.11"
+# PyO3-based dependencies (pydantic-core, rpds-py, ...) do not support 3.14 yet.
+requires-python = ">=3.11,<3.14"
 license = { text = "MIT" }
 authors = [
     { name = "First Team", email = "team1@example.edu" }
@@ -39,6 +40,7 @@ dev = [
     "mypy>=1.7.0",
     "pre-commit>=3.5.0",
 ]
+llm = ["openai>=1.0"]
 
 [project.scripts]
 fsa = "fsa.cli:main"

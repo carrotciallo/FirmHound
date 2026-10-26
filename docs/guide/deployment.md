@@ -63,7 +63,7 @@ sudo apk update && sudo apk upgrade
 装完后的自检：
 
 ```bash
-python3 --version      # 需要 3.11 或更高
+python3 --version      # 需要 3.11–3.13（3.14 暂不支持 PyO3 依赖）
 make doctor
 ```
 

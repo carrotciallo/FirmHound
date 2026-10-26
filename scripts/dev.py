@@ -11,6 +11,8 @@ Commands:
     test-all      Run unit + optional host integration tests
     integration   Run host integration tests only
     ext-smoke     Probe all four optional external analyzers
+    firmrec-doctor Probe the FirmRec native/Docker backend
+    firmrec-smoke Run FirmRec against an existing run directory
     lint          Run ruff check
     format        Run ruff format
     clean         Remove build artifacts and caches
@@ -22,6 +24,7 @@ Commands:
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -40,7 +43,17 @@ def _in_venv() -> bool:
 
 
 def _require_venv(action: str) -> None:
-    """Refuse to install into the system interpreter."""
+    """Refuse to install into the system interpreter or an unsupported Python."""
+    if not (3, 11) <= sys.version_info[:2] <= (3, 13):
+        _log(
+            "unsupported_python",
+            action=action,
+            version=sys.version.split()[0],
+            supported="3.11-3.13",
+            hint="PyO3-based dependencies do not support 3.14; use "
+            "`make setup PYTHON=python3.13`",
+        )
+        raise SystemExit(1)
     if _in_venv():
         return
     _log(
@@ -49,6 +62,8 @@ def _require_venv(action: str) -> None:
         hint="先执行 `make venv`，或用 .venv/bin/python scripts/dev.py",
     )
     raise SystemExit(1)
+
+
 def _log(event: str, **fields: object) -> None:
     """One-line log to stderr; keeps this script dependency-free."""
     detail = " ".join(f"{key}={value}" for key, value in fields.items())
@@ -136,6 +151,28 @@ def cmd_ext_smoke(args: argparse.Namespace) -> int:
             }
     overall = "ok" if all(item["status"] == "ok" for item in results.values()) else "degraded"
     _log("external_probe_complete", status=overall, tools=results)
+    return 0
+
+
+def cmd_firmrec_doctor(args: argparse.Namespace) -> int:
+    """Probe the FirmRec backend without running the pipeline."""
+    from tools.external.adapter import _load_global_external
+    from tools.external.firmrec.doctor import check_local_stack, format_report
+
+    external = _load_global_external()
+    cfg = dict(external.get("firmrec", {}) or {})
+    report = check_local_stack(cfg)
+    print(format_report(report))
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_firmrec_smoke(args: argparse.Namespace) -> int:
+    """Run FirmRec against an existing run directory."""
+    from tools.external.adapter import run_firmrec
+
+    result = run_firmrec(args.run_dir)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -233,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("test-all", help="Run unit and optional integration tests")
     sub.add_parser("integration", help="Run host integration tests")
     sub.add_parser("ext-smoke", help="Probe optional external analyzers")
+    sub.add_parser("firmrec-doctor", help="Probe the FirmRec native/Docker backend")
+    firmrec_smoke = sub.add_parser(
+        "firmrec-smoke", help="Run FirmRec against an existing run directory"
+    )
+    firmrec_smoke.add_argument("--run-dir", required=True, help="Pipeline run directory.")
     sub.add_parser("lint", help="Run ruff check")
     sub.add_parser("format", help="Run ruff format")
     sub.add_parser("clean", help="Remove build artifacts and caches")
@@ -247,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
         "test-all": cmd_test_all,
         "integration": cmd_integration,
         "ext-smoke": cmd_ext_smoke,
+        "firmrec-doctor": cmd_firmrec_doctor,
+        "firmrec-smoke": cmd_firmrec_smoke,
         "lint": cmd_lint,
         "format": cmd_format,
         "clean": cmd_clean,

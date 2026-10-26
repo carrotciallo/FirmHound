@@ -9,7 +9,8 @@ FirmHound（固件猎犬）：IoT 固件漏洞挖掘自动化流水线。本文�
   Alpine 容器均需可用）。Windows、WSL 适配层已移除，不要再引入路径翻译、`.bat` 壳、
   `wsl -d ...` 之类的代码或文档。
 - 文档里写安装步骤时不要只给 `apt`：按发行版并列给出，或指向 `README.md` 的依赖矩阵。
-- Python 3.11+；一律用项目内的 `.venv`，不要往系统 Python 装包。入口是 `make`：
+- Python 3.11–3.13（上限由 PyO3 依赖决定，3.14 暂不支持）；一律用项目内的 `.venv`，
+  不要往系统 Python 装包。入口是 `make`：
   `make dev` 建环境并 editable 安装，其余目标都走 `.venv/bin/python`。
 - 解包与动态验证依赖系统工具：`binwalk`、`unsquashfs`、`sasquatch`、`qemu-*`。
   缺失时工具必须降级，不得让主链路崩。

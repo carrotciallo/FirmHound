@@ -9,16 +9,22 @@
 ```bash
 cat /etc/os-release      # 发行版与版本
 uname -m                 # CPU 架构
-python3 --version        # 需要 3.11 或更高
+python3 --version        # 需要 3.11–3.13（3.14 暂不支持）
 ```
 
 FirmHound 只依赖 Linux 原生工具链。x86_64 与 aarch64 都可以；glibc 和 musl 都支持，区别只在包名。
+
+> **Python 版本上限**：依赖链中的 PyO3 扩展（如 `pydantic-core`、`rpds-py`）目前要求
+> Python ≤ 3.13，Python 3.14 会在 `pip install` 阶段报
+> `pyo3 ... requires Python <= 3.13` 一类错误。Fedora 44 等新发行版的默认 `python3`
+> 可能已经是 3.14，请显式安装/使用 Python 3.13，并执行
+> `make setup PYTHON=python3.13`。
 
 ## 1. 依赖分三档
 
 | 工具 | 用途 | 缺了会怎样 |
 |---|---|---|
-| `python3` ≥ 3.11 + `venv` | 跑 CLI | 装不上 |
+| `python3` 3.11–3.13 + `venv` | 跑 CLI | 装不上（3.14 暂不支持 PyO3 依赖） |
 | `git`、`gcc`、`make` | 拉代码、编译 sasquatch | 部分解包能力缺失 |
 | `file`、`binutils`（`readelf`/`strings`/`objdump`） | 文件识别、ELF 解析、反汇编 | 二进制阶段降级 |
 | `binwalk` | 固件签名扫描 | 解包阶段无法自动识别布局 |
@@ -30,6 +36,10 @@ FirmHound 只依赖 Linux 原生工具链。x86_64 与 aarch64 都可以；glibc
 | KLEE / BOND / SaTC / FirmRec | 外部分析器 | `EXTERNAL_ANALYSIS` 及以后跳过 |
 
 前四档里任何一项缺失，只会让对应阶段降级，主流程仍然跑完并给出报告。装齐了才谈得上完整覆盖。
+
+FirmRec 的外部分析器需要额外的一整套工具链（JDK 18 / Ghidra 10.2.2 / Maven / PostgreSQL /
+Python 3.9）。原生安装步骤与版本矩阵见
+[`firmrec-native.md`](firmrec-native.md)；不安装时 FirmRec 阶段自动 `skipped`，不影响主链。
 
 ## 2. 按发行版安装
 
@@ -65,6 +75,9 @@ sudo dnf install -y \
 需要注意的点：
 
 - Fedora 仓库里**没有** `sasquatch`，只能源码编译，见 §3。
+- Fedora 44+ 的默认 `python3` 可能是 3.14；请安装 `python3.13` 并用
+  `make setup PYTHON=python3.13`，否则依赖链里的 PyO3 扩展会报
+  `requires Python <= 3.13`。
 - Fedora 40+ 的 `binwalk` 是 3.x（Rust 重写版），扫描更快，但解包仍然调用外部 `sasquatch` / `unsquashfs`，外部工具一个都不能少。
 - `squashfs-tools` 4.6.1 起自带 lzma 解码，`unsquashfs -s` 能读出 `Compression lzma` 的超级块。部分厂商镜像的 fragment table 仍会解崩，这类镜像需要 `sasquatch`。
 - Fedora 40 起 `p7zip` 已退役，7z 由 `7zip` 包提供。老版本仍是 `p7zip` + `p7zip-plugins`。
@@ -258,7 +271,7 @@ make setup
 手动等价写法：
 
 ```bash
-python3 -m venv .venv
+python3.13 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/pip install -e .
 .venv/bin/python -m fsa.cli doctor
@@ -270,7 +283,8 @@ python3 -m venv .venv
 pipx install .
 ```
 
-Python 解释器不在默认路径时用 `make setup PYTHON=python3.12`。
+Python 解释器不在默认路径时用 `make setup PYTHON=python3.13`；请保持在 3.11–3.13
+范围内，不要使用 3.14（PyO3 依赖尚未支持）。
 
 ## 5. 验证
 

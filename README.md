@@ -4,9 +4,9 @@
 
 **IoT 固件漏洞挖掘自动化流水线** · 解包 → 攻击面 → 二进制分析 → 静态审计 → 十维评分 → 反证验证 → 动态验证 → 证据报告
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-339%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-375%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -63,8 +63,8 @@
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
-| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 22 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，339 项单元测试持续守护 |
+| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 23 节骨架，静态结论保留反证与限制 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，375 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -121,7 +121,8 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
 ## 环境配置（Linux）
 
 支持 Debian/Ubuntu 系、Fedora/RHEL 系、Arch/Manjaro、openSUSE、Alpine，glibc 与 musl 都可以。
-静态分析层是纯 Python，Python 3.11+ 装好就能跑；解包与动态验证依赖宿主工具，缺了只让对应阶段降级，不中断主链。
+静态分析层是纯 Python，Python 3.11–3.13 装好就能跑（3.14 暂不支持：PyO3 依赖要求
+≤ 3.13）；解包与动态验证依赖宿主工具，缺了只让对应阶段降级，不中断主链。
 
 **按发行版安装 → [`docs/guide/install.md`](docs/guide/install.md)**
 
@@ -261,7 +262,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 |---|---|---|
 | `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
 | `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
-| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run | `runs/<run-id>/` 全量证据、状态、报告 |
+| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具 | `runs/<run-id>/` 全量证据、状态、报告 |
 | `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
@@ -270,6 +271,9 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `make test` | 跑全部单元测试 | — |
 | `make test-all` | 单元测试 + 主机相关集成测试 | — |
 | `make ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
+| `make firmrec-doctor` | 检查 FirmRec 原生/Docker 后端依赖 | readiness JSON |
+| `make firmrec-deps FIRMREC_PYTHON=python3.9` | 建 FirmRec 专用 Python 环境并装上游依赖 | `.venv-firmrec/` |
+| `make firmrec-smoke RUN_DIR=runs/<id>` | 对已有 run 执行 FirmRec | `artifacts/external_findings/firmrec.json` |
 | `make lint` | ruff 代码检查 | — |
 | `make format` | 自动格式化 | — |
 | `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
@@ -335,7 +339,7 @@ export OPENAI_API_KEY=sk-xxx
 | 04-audit | 静态审计 | 数据流模型、七层模板、误报五规则；子技能 command-injection / buffer-overflow |
 | 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定 |
 | 06-dynamic-validation | 动态验证 | L0–L3 分层、qemu-user 三大坑、安全门 |
-| 07-report | 报告生成 | 22 节骨架、8 项合规扫描、脱敏 |
+| 07-report | 报告生成 | 23 节骨架、8 项合规扫描、脱敏 |
 | 08-external-analyzers | 双轨外部分析 | SaTC/FirmRec/KLEE/BOND、汇聚、降级与先验隔离 |
 
 ## 外部分析器双轨链
@@ -345,8 +349,10 @@ RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描�
 会被代码强制关闭，结果独立保存且不计入零先验指标。
 
 四器全部是可选增强：总开关和单工具开关默认关闭；缺镜像、缺 KLEE、超时或解析失败
-都必须返回结构化 `status + limitation`，不能阻断主报告。安装、能力边界和复现状态见
-`docs/external/README.md`。
+都必须返回结构化 `status + limitation`，不能阻断主报告。FirmRec 支持
+`backend: auto | local | docker`，原生安装（不用 Docker）见
+[`docs/guide/firmrec-native.md`](docs/guide/firmrec-native.md)；只有 rootfs 时会打 tar
+兜底并在报告中记 limitation。安装、能力边界和复现状态见 `docs/external/README.md`。
 
 ## 评分与结论模型
 
