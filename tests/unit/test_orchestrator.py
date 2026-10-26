@@ -69,6 +69,32 @@ def test_planner_extract_from_nl(planner: Planner) -> None:
     assert "/firmwares/ac15.bin" in (card.get("firmware_path") or "")
 
 
+def test_planner_nl_depth_applies_without_explicit_depth(planner: Planner) -> None:
+    card = planner.parse_task(
+        {
+            "task_id": "T-003b",
+            "natural_language": "分析固件，授权测试，完整分析。",
+            "firmware_path": "firmwares/ac15.bin",
+            "authorization": "team",
+        }
+    )
+    assert card["depth"] == "full"
+
+
+def test_planner_explicit_depth_wins_over_nl(planner: Planner) -> None:
+    """Regression: NL "完整" must not silently override an explicit depth."""
+    card = planner.parse_task(
+        {
+            "task_id": "T-003c",
+            "natural_language": "分析固件，授权测试，完整分析。",
+            "firmware_path": "firmwares/ac15.bin",
+            "authorization": "team",
+            "depth": "standard",
+        }
+    )
+    assert card["depth"] == "standard"
+
+
 def test_planner_extracts_safe_task_package(tmp_path: Path, planner: Planner) -> None:
     fw = "firmware/ac15.bin"
     package = tmp_path / "task.zip"

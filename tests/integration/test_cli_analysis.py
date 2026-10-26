@@ -186,6 +186,67 @@ def test_cli_plan_exposes_blind_flag() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def test_cli_analyze_rejects_empty_authorization_holder() -> None:
+    """An empty holder must not start a run; plan already gates on it."""
+    workspace = (Path("tmp") / f"cli-empty-holder-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--authorization-holder",
+                "  ",
+                "--run-id",
+                "cli-empty-holder",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "authorization-holder" in result.output
+        assert not (workspace / "runs" / "cli-empty-holder").exists()
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_plan_explicit_depth_wins_over_natural_language() -> None:
+    """Regression: a task text saying 完整 must not override --depth standard."""
+    workspace = (Path("tmp") / f"cli-plan-depth-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        firmware = workspace / "rootfs" / "router.bin"
+        firmware.parent.mkdir(parents=True, exist_ok=True)
+        firmware.write_bytes(b"firmware")
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "plan",
+                "--task",
+                "分析厂商为Tenda、型号AC15的固件，授权测试，完整分析。",
+                "--firmware-path",
+                str(firmware),
+                "--depth",
+                "standard",
+                "--authorization-holder",
+                "fixture-owner",
+                "--json-output",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["depth"] == "standard"
+        assert "EXTERNAL_ANALYSIS" not in payload["stages"]
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def test_cli_plan_from_natural_language_and_package() -> None:
     workspace = (Path("tmp") / f"cli-plan-test-{uuid.uuid4().hex}").resolve()
     workspace.mkdir(parents=True)

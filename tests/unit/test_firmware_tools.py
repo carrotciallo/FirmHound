@@ -1,10 +1,13 @@
 """Unit tests for firmware unpacking tools."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from fsa.utils.jsonio import load_json, save_json, save_yaml
 from fsa.utils.proc import RunResult
+from tools.firmware import pipeline as firmware_pipeline
 from tools.firmware.arch_detect import detect_architecture
 from tools.firmware.collect_info import _binwalk_signatures, collect_info
 from tools.firmware.rootfs_score import score_rootfs_candidates
@@ -330,3 +333,85 @@ def test_squashfs_wins_over_gzip_signature() -> None:
     )
     assert strategy is not None
     assert strategy["name"] == "squashfs"
+
+
+def _run_unpack_with_declared_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    baseline: dict[str, Any],
+) -> dict[str, Any]:
+    """Drive execute_unpack with stubbed tools and a declared task card."""
+    firmware = tmp_path / "router.bin"
+    firmware.write_bytes(b"firmware-bytes")
+    run_dir = tmp_path / "runs" / "run-meta"
+    save_json(
+        run_dir / "state" / "task_card.json",
+        {
+            "task_id": "run-meta",
+            "firmware_path": str(firmware),
+            "vendor": "D-Link",
+            "model": "DIR-859",
+            "version": "v1.02b03",
+            "authorization": {"holder": "owner", "scope": "analysis-only"},
+        },
+    )
+    safety_path = tmp_path / "safety.yaml"
+    save_yaml(
+        safety_path,
+        {
+            "enforce": True,
+            "abort_on_violation": True,
+            "allowed_paths": [str(tmp_path)],
+            "blocked_paths": [],
+            "command_blacklist": [],
+            "network": {"allow_public": False, "allowed_hosts": ["localhost"]},
+            "model": {},
+        },
+    )
+    rootfs = tmp_path / "rootfs"
+    rootfs.mkdir()
+    monkeypatch.setattr(firmware_pipeline, "collect_info", lambda _path: dict(baseline))
+    monkeypatch.setattr(
+        firmware_pipeline, "unpack", lambda *_a, **_k: {"method": "squashfs"}
+    )
+    monkeypatch.setattr(
+        firmware_pipeline,
+        "score_rootfs_candidates",
+        lambda _out: {
+            "best": {"path": str(rootfs), "score": 8},
+            "threshold_met": True,
+            "extraction_confidence": 1.0,
+        },
+    )
+    result = firmware_pipeline.execute_unpack(
+        str(run_dir), str(tmp_path / "temp"), str(safety_path)
+    )
+    assert result["status"] == "ok"
+    return load_json(run_dir / "artifacts" / "firmware_baseline.json")
+
+
+def test_unpack_baseline_fills_vendor_model_version_from_task_card(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: declared --vendor/--model/--version must reach the baseline."""
+    baseline = _run_unpack_with_declared_metadata(
+        tmp_path,
+        monkeypatch,
+        {"vendor": None, "model": None, "version": None, "status": "success"},
+    )
+    assert baseline["vendor"] == "D-Link"
+    assert baseline["model"] == "DIR-859"
+    assert baseline["version"] == "v1.02b03"
+
+
+def test_unpack_baseline_detected_hint_is_not_overwritten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declared metadata fills empty slots only; a detected hint stays."""
+    baseline = _run_unpack_with_declared_metadata(
+        tmp_path,
+        monkeypatch,
+        {"vendor": "HintVendor", "model": None, "version": None, "status": "success"},
+    )
+    assert baseline["vendor"] == "HintVendor"
+    assert baseline["model"] == "DIR-859"
