@@ -235,7 +235,7 @@ class Orchestrator:
         if state["status"] != "aborted" and all(
             stage in state.get("completed_stages", [])
             for stage in stages
-            if stage != Stage.DONE.value
+            if stage not in {Stage.INIT.value, Stage.DONE.value}
         ):
             self._state_manager.mark_stage_complete(Stage.DONE.value)
             state = self._state_manager.load()

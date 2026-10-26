@@ -128,6 +128,8 @@ agent:
 - `runs/<id>/evidence/ev-*.json`：`stage=AGENT_LOOP` 的确定性事实。
 - `runs/<id>/decisions/dec-*.json`：`actor=model|rule` 的动作选择记录。
 - `report.md` 第 24 节「自主分析轨迹」：只渲染计数和结论边界，不渲染模型原文。
+- 中断或仍在运行时，可用 `fsa report <run-id>` 生成 `report.partial.md` 快照；
+  它只读已有产物，不跑分析、验证或模型。
 
 ## 安全边界
 

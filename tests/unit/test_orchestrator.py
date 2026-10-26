@@ -188,6 +188,19 @@ def test_state_manager_lifecycle(tmp_path: Path) -> None:
     assert state["current_stage"] == "B"
 
 
+def test_state_manager_resume_skips_init_and_finishes(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-002")
+    sm.init({"task_id": "run-002"}, {"stages": ["INIT", "A", "B", "DONE"]})
+    sm.mark_stage_complete("A")
+    state = sm.resume()
+    assert state["current_stage"] == "B"
+
+    sm.mark_stage_complete("B")
+    state = sm.resume()
+    assert state["current_stage"] == "DONE"
+    assert state["status"] == "done"
+
+
 def test_human_gate_inject_evidence(tmp_path: Path) -> None:
     hg = HumanGate(tmp_path / "run-002")
     (tmp_path / "run-002" / "evidence").mkdir(parents=True)

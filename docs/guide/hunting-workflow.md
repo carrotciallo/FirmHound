@@ -240,6 +240,30 @@ qemu-mips-static -L tmp/unpacked/_DIR-859_Ax_FW_113b03.bin.extracted/squashfs-ro
 
 ---
 
+## 8.5 中断时生成快照报告（可选）
+
+分析跑到一半，或 `AGENT_LOOP` 还在执行时，可以只根据已有产物生成一份快照，
+不会重新跑分析、验证或模型：
+
+```bash
+fsa report hunt1 --limit 20
+# 输出：runs/hunt1/report.partial.md
+```
+
+快照会列出：
+
+- 当前 `status` / `current_stage` / 已完成与未完成阶段
+- 解包结果、攻击面与二进制数量
+- 当前候选与 Top N 排序
+- 如果有 `verdict.json`，附上已有裁决；没有就明确写「VERIFY_TOP_K 未完成」
+- `AGENT_LOOP` 已执行的动作、模型调用、token、回退与 limitations
+- 缺失产物和恢复命令 `fsa resume <run-id>`
+
+它不会写 `report.md` 或 `final_verdict.json`，也不会把未验证候选说成确认漏洞。
+恢复完成后，仍以最终 `report.md` 为准。
+
+---
+
 ## 9. 常见问题（小白高频踩坑）
 
 | 问题 | 原因 | 解决 |

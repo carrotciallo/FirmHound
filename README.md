@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-427%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-431%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -69,7 +69,7 @@
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，427 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，431 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -270,6 +270,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind] [--agent] [--agent-tier standard\|dynamic\|external]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具与 Agent；`--agent` 开启有界自主取证 | `runs/<run-id>/` 全量证据、状态、报告、`agent_trace.json` |
 | `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
+| `fsa report <run-id> [--limit N]` | 从已有产物生成中断快照报告；不运行分析、验证或模型 | `runs/<id>/report.partial.md` |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
 | `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
 | `make smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |

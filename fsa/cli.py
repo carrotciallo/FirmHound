@@ -24,6 +24,7 @@ from fsa.utils.platform_info import detect as detect_platform
 from fsa.utils.platform_info import hint_for
 from tools.firmware.diagnose import diagnose_firmware
 from tools.report.explain import build_evidence_ledger, render_ledger_markdown
+from tools.report.partial import execute_partial_report
 
 
 def _render_value(key: str, item: Any) -> Any:
@@ -794,6 +795,49 @@ def show_status(ctx: click.Context, run_id: str, json_output: bool) -> None:
         },
         json_output,
     )
+
+
+@main.command(name="report")
+@click.argument("run_id")
+@click.option(
+    "--limit",
+    type=int,
+    default=20,
+    show_default=True,
+    help="Top N candidates in the snapshot; use 0 for all.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Optional output path; default runs/<id>/report.partial.md.",
+)
+@click.option("--json-output", is_flag=True)
+@click.pass_context
+def partial_report(
+    ctx: click.Context,
+    run_id: str,
+    limit: int,
+    output_path: Path | None,
+    json_output: bool,
+) -> None:
+    """Generate an interruption snapshot report from existing artifacts only."""
+    try:
+        validate_run_id(run_id)
+        orchestrator = Orchestrator(config_path=ctx.obj["config"])
+        run_dir = Path(orchestrator.config["paths"]["runs"]) / run_id
+        orchestrator.policy.check_path(run_dir)
+        if output_path is not None:
+            orchestrator.policy.check_path(output_path)
+    except Exception as exc:  # noqa: BLE001
+        raise click.ClickException(str(exc)) from exc
+    try:
+        result = execute_partial_report(run_dir, limit=limit, output_path=output_path)
+    except Exception as exc:  # noqa: BLE001
+        raise click.ClickException(str(exc)) from exc
+    if result.get("status") != "ok":
+        raise click.ClickException(str(result.get("reason", "report failed")))
+    _emit(result, json_output)
 
 
 @main.command()

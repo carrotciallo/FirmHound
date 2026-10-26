@@ -86,6 +86,8 @@ class StateManager:
         stages = plan.get("stages", [])
         completed = set(state.get("completed_stages", []))
         for stage in stages:
+            if stage in {"INIT", "DONE"}:
+                continue
             if stage not in completed:
                 state["current_stage"] = stage
                 self.save(state)

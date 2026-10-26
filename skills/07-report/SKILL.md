@@ -30,6 +30,8 @@ tags: [report, verdict, compliance, m10, redaction]
 
 - `report.md`：固定 24 节章节（与 `tools/report/generate.py::_SECTIONS` 一致）
 - `final_verdict.json`：`{run_id, firmware_sha256, findings:[...], stats:{...}}`
+- `report.partial.md`：中断快照（`fsa report <run-id>`），只汇总已有产物；不写
+  `report.md` / `final_verdict.json`，不把未验证候选说成确认漏洞。
 
 ## 报告 24 节固定骨架
 
@@ -102,6 +104,7 @@ tags: [report, verdict, compliance, m10, redaction]
 | FirmRec 在 Blind Run 被请求 | 强制 `skipped/FORCED_DISABLE`，只报告隔离事实，不渲染已知 CVE 结果 |
 | Agent 未启用 / Blind | 第 24 节写「未启用」或「Blind 强制禁用」，不阻断报告 |
 | agent_trace 缺失或损坏 | 第 24 节降级说明，不阻断报告 |
+| 分析中断 / 仍在运行 | `fsa report <run-id>` 生成 `report.partial.md`，列出未完成阶段与缺失产物 |
 
 ## 验收标准
 
