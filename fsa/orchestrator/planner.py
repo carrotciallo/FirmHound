@@ -103,7 +103,7 @@ class Planner:
             "vendor": input_data.get("vendor"),
             "model": input_data.get("model"),
             "version": input_data.get("version"),
-            "depth": input_data.get("depth", "standard"),
+            "depth": input_data.get("depth") or "standard",
             "blind": bool(input_data.get("blind", False)),
             "constraints": input_data.get("constraints", []),
             "attachments": [],
@@ -133,6 +133,12 @@ class Planner:
         package = input_data.get("task_package")
         if package:
             task_card = self._extract_from_package(package, task_card)
+
+        # An explicitly supplied depth wins over natural-language heuristics:
+        # a task text mentioning "完整/full" must not silently override a
+        # caller who deliberately passed depth="standard".
+        if input_data.get("depth"):
+            task_card["depth"] = input_data["depth"]
 
         # Mandatory slot checks.
         if not task_card.get("firmware_path") and not input_data.get("firmware_url"):

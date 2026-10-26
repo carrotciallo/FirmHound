@@ -183,8 +183,8 @@ def main(ctx: click.Context, config: Path) -> None:
 @click.option(
     "--depth",
     type=click.Choice(["quick", "standard", "full"]),
-    default="standard",
-    show_default=True,
+    default=None,
+    help="Analysis depth (default: standard; depth words in --task apply only when omitted).",
 )
 @click.option("--authorization-holder", default="", help="Authorized owner/operator name.")
 @click.option("--authorization-scope", default="analysis-only", show_default=True)
@@ -207,7 +207,7 @@ def plan(
     task: str | None,
     task_package: Path | None,
     firmware_path: Path | None,
-    depth: str,
+    depth: str | None,
     authorization_holder: str,
     authorization_scope: str,
     allow_emulation: bool,
@@ -325,8 +325,8 @@ def plan(
 @click.option(
     "--depth",
     type=click.Choice(["quick", "standard", "full"]),
-    default="standard",
-    show_default=True,
+    default=None,
+    help="Analysis depth (default: standard).",
 )
 @click.option("--authorization-holder", required=True, help="Authorized owner/operator name.")
 @click.option("--authorization-scope", default="analysis-only", show_default=True)
@@ -351,7 +351,7 @@ def analyze(
     ctx: click.Context,
     input_paths: tuple[Path, ...],
     input_type: str,
-    depth: str,
+    depth: str | None,
     authorization_holder: str,
     authorization_scope: str,
     allow_emulation: bool,
@@ -381,6 +381,8 @@ def analyze(
     the run identifier; with several, it becomes a prefix and every run is
     named <run-id>-<n>-<input>.
     """
+    if not authorization_holder.strip():
+        raise click.ClickException("--authorization-holder must not be empty")
     if run_id:
         try:
             validate_run_id(run_id)
@@ -502,7 +504,7 @@ def _analyse_one(
             "analysis_started",
             run_id=task_card["task_id"],
             input_type=kind,
-            depth=options["depth"],
+            depth=task_card["depth"],
         )
         state = orchestrator.run(task_card)
     except Exception as exc:  # noqa: BLE001
