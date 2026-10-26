@@ -154,6 +154,23 @@ def test_resume_does_not_duplicate_steps_or_evidence(tmp_path: Path) -> None:
     assert len(list((run / "evidence").glob("*.json"))) == first_evidence
 
 
+def test_resume_replays_interrupted_trace_with_skipped_status(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    options = _options()
+    config = {"runtime": {"default": "mock"}}
+    agent_loop.run_agent_loop(run, options=options, config=config)
+    trace_path = run / "artifacts" / "agent_trace.json"
+    interrupted = load_json(trace_path)
+    interrupted["status"] = "skipped"  # incremental writes keep the skeleton status
+    save_json(trace_path, interrupted)
+    first_evidence = len(list((run / "evidence").glob("*.json")))
+
+    agent_loop.run_agent_loop(run, options=options, config=config)
+    resumed = load_json(trace_path)
+    assert len(resumed["steps"]) == len(interrupted["steps"])
+    assert len(list((run / "evidence").glob("*.json"))) == first_evidence
+
+
 def test_forbidden_field_mutation_is_restored(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

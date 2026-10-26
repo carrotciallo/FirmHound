@@ -326,15 +326,24 @@ def run_agent_loop(
             previous = load_json(trace_path)
         except Exception:  # noqa: BLE001 - corrupt trace restarts the stage
             previous = {}
-        if (
-            isinstance(previous, dict)
-            and previous.get("enabled")
-            and previous.get("status") != "skipped"
-        ):
+        if isinstance(previous, dict) and previous.get("enabled") and previous.get("steps"):
             replayed = [entry for entry in previous.get("steps", []) if isinstance(entry, dict)]
             trace["steps"] = list(replayed)
             trace["started_at"] = previous.get("started_at", trace["started_at"])
             trace["limitations"] = list(previous.get("limitations", []))
+            previous_model = previous.get("model", {})
+            if isinstance(previous_model, dict):
+                trace["model"].update(previous_model)
+            previous_budget = previous.get("budget", {})
+            if isinstance(previous_budget, dict):
+                used_calls = int(previous_budget.get("used_model_calls", 0))
+                used_tokens = int(previous_budget.get("used_model_tokens", 0))
+                trace["budget"]["used_model_calls"] = used_calls
+                trace["budget"]["used_model_tokens"] = used_tokens
+                budget.total_calls = used_calls
+                budget.stage_calls_used = used_calls
+                budget.total_tokens_used = used_tokens
+                budget.stage_tokens_used = used_tokens
             for entry in replayed:
                 cid = str(entry.get("candidate_id", ""))
                 state = next(
@@ -347,9 +356,19 @@ def run_agent_loop(
                 if action:
                     state.tried.add(action)
                 if entry.get("status") in {"ok", "degraded"}:
+                    facts = state.candidate.setdefault("agent_facts", [])
                     for fact in entry.get("produced_facts", []):
-                        state.missing.discard(str(fact))
-                    state.evidence_added.extend(str(ev) for ev in entry.get("evidence_ids", []))
+                        fact = str(fact)
+                        state.missing.discard(fact)
+                        if fact not in facts:
+                            facts.append(fact)
+                    evidence_ids = [str(ev) for ev in entry.get("evidence_ids", [])]
+                    candidate_evidence = state.candidate.setdefault("evidence", [])
+                    for evidence_id in evidence_ids:
+                        if evidence_id not in candidate_evidence:
+                            candidate_evidence.append(evidence_id)
+                        if evidence_id not in state.evidence_added:
+                            state.evidence_added.append(evidence_id)
 
     max_steps = int(options.get("max_steps", 20))
     max_steps_per_candidate = int(options.get("max_steps_per_candidate", 4))
