@@ -43,6 +43,12 @@ def execute_unpack(
     out = (Path(temp_root).resolve() / Path(run_dir).resolve().name / "unpacked").resolve()
     policy.check_path(out)
     baseline = collect_info(input_path)
+    # Fill baseline slots the string hints could not detect from the values
+    # declared on the task card (--vendor/--model/--version). A detected hint
+    # is kept when the task card declares nothing for that slot.
+    for key in ("vendor", "model", "version"):
+        if not baseline.get(key) and task.get(key):
+            baseline[key] = task[key]
     extraction = unpack(input_path, out, policy=policy)
     scored = score_rootfs_candidates(out)
     best = scored.get("best")

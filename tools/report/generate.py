@@ -58,21 +58,65 @@ def _finding_count(payload: Any) -> int:
     return 0
 
 
+# Mirrors tools.external.adapter.EXTERNAL_TOOLS; kept local so the report
+# can name the analyzers even when no external stage produced an artifact.
+_EXTERNAL_TOOL_NAMES = ("satc", "firmrec", "klee", "bond")
+
+
 def _tool_statuses(payload: Any) -> str:
     """Summarize per-tool statuses from ``all.json`` (``per_tool``) or legacy keys."""
-    if not isinstance(payload, dict):
-        return "未启用"
+    names = "/".join(_EXTERNAL_TOOL_NAMES)
+    if not isinstance(payload, dict) or not payload:
+        return f"未运行（无外部分析产物；{names} 均未启用）"
     per_tool = payload.get("per_tool")
     if isinstance(per_tool, dict) and per_tool:
         parts = []
         for name, info in sorted(per_tool.items()):
-            status = info.get("status") if isinstance(info, dict) else str(info)
-            parts.append(f"{name}={status or 'unknown'}")
+            if isinstance(info, dict):
+                status = info.get("status") or "unknown"
+                limitation = info.get("limitation")
+                parts.append(
+                    f"{name}={status}（{limitation}）" if limitation else f"{name}={status}"
+                )
+            else:
+                parts.append(f"{name}={info}")
         return ", ".join(parts)
     statuses = payload.get("tool_statuses")
     if isinstance(statuses, dict) and statuses:
         return ", ".join(f"{name}={status}" for name, status in sorted(statuses.items()))
+    if payload.get("status") == "skipped":
+        base = f"全部未启用（{names} 均未运行）"
+        limitation = payload.get("limitation")
+        return f"{base}；{limitation}" if limitation else base
     return "未启用"
+
+
+def _external_unavailable(payload: Any) -> bool:
+    """True when no external analyzer contributed any corroborating result."""
+    if _finding_count(payload) > 0:
+        return False
+    if not isinstance(payload, dict) or not payload:
+        return True
+    if payload.get("status") == "skipped":
+        return True
+    per_tool = payload.get("per_tool")
+    if isinstance(per_tool, dict) and per_tool:
+        return all(
+            (info.get("status") if isinstance(info, dict) else str(info)) != "ok"
+            for info in per_tool.values()
+        )
+    return payload.get("status") != "ok"
+
+
+def _external_section(payload: Any) -> str:
+    """Render the external-analyzer section, naming tools and limited claims."""
+    text = f"规范化外部发现：{_finding_count(payload)}；工具状态：{_tool_statuses(payload)}。"
+    if _external_unavailable(payload):
+        text += (
+            "受限结论：外部分析器未提供跨二进制污点传播与交叉验证，"
+            "候选结论仅依据静态分析与反证审查。"
+        )
+    return text
 
 
 def _false_positive_summary(
@@ -210,10 +254,7 @@ def _section_body(
             f"证据完整度：{fp_summary['evidence_completeness']}。"
         ),
         "本地动态验证": f"状态：{validation.get('status', '未执行') if isinstance(validation, dict) else '未执行'}；不将加载测试表述为漏洞复现。",
-        "外部分析器结果": (
-            f"规范化外部发现：{_finding_count(external)}；"
-            f"工具状态：{_tool_statuses(external)}。"
-        ),
+        "外部分析器结果": _external_section(external),
         "复发漏洞（FirmRec）": (
             f"复发发现：{_finding_count(recurrence)} 条；盲跑隔离：{isolated} 条；"
             f"命中签名：{', '.join(cves[:5]) or '无'}。"
