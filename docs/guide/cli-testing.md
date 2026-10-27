@@ -96,6 +96,22 @@ cat progress.log            # 含 [n/total] STAGE 开始行与 ok/degraded 结�
 - `--agent-print-model` 只在模型实际参与动作选择时输出经过校验的
   `model chose <action> (confidence ...): <reason>`；默认关闭，且不输出原始 prompt/回复
 
+## 4.1 中断/续跑判定
+
+```bash
+# 正常续跑
+fsa resume <run_id>
+# 回退到指定阶段重跑
+fsa resume <run_id> --from-stage AGENT_LOOP
+```
+
+通过标准：
+
+- `state/run.lock` 被另一个进程持有时，`fsa resume` 拒绝执行并报出持有者 pid
+- 进程被 kill 后（锁已由内核释放），即使 `run_state.json` 仍是 `status=running`，
+  `fsa resume --from-stage ...` 也应成功，不需要 `--force`
+- 回退前生成 `state/run_state.rewind-*.json` 备份，`metadata.last_rewind.stale_running=true`
+
 ## 5. Full Depth 降级
 
 ```bash

@@ -77,12 +77,22 @@ class StateManager:
         self.save(state)
         return state
 
-    def rewind_to(self, stage: str, *, force: bool = False) -> dict[str, Any]:
+    def rewind_to(
+        self,
+        stage: str,
+        *,
+        force: bool = False,
+        active: bool | None = None,
+    ) -> dict[str, Any]:
         """Reopen a run at ``stage`` so it and every later stage run again.
 
         Earlier completed stages are preserved; later stages are removed from
         ``completed_stages``. The pre-rewind state is backed up under
         ``state/run_state.rewind-*.json`` before anything is modified.
+
+        ``active=False`` means the caller verified that no process holds the
+        run lock; the stale ``running`` marker is then safe to rewind.
+        ``active=None`` is unknown and keeps the conservative refusal.
         """
         state = self.load()
         stages = (state.get("plan") or {}).get("stages") or []
@@ -92,7 +102,8 @@ class StateManager:
             raise ValueError(f"Unknown stage {stage!r}; choose from {stages}")
         if stage in {"INIT", "DONE"}:
             raise ValueError(f"Cannot rewind to {stage}; choose a real analysis stage")
-        if state.get("status") == "running" and not force:
+        was_running = state.get("status") == "running"
+        if was_running and not force and active is not False:
             raise RuntimeError(
                 "Run is still marked running; stop the active process first or pass --force"
             )
@@ -122,6 +133,7 @@ class StateManager:
             "from_stage": stage,
             "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "backup": str(backup),
+            "stale_running": bool(was_running and active is False and not force),
         }
         self.save(state)
         return state

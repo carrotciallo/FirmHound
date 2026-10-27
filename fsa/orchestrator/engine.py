@@ -22,6 +22,7 @@ from fsa.schemas.loader import validate
 from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_json, load_yaml
 from fsa.utils.progress import use_progress
+from fsa.utils.runlock import RunLock
 
 if TYPE_CHECKING:
     from fsa.utils.progress import PipelineProgress
@@ -133,6 +134,7 @@ class Orchestrator:
         self._decision_store: DecisionStore | None = None
         self._human_gate: HumanGate | None = None
         self._budget: Budget | None = None
+        self._run_lock: RunLock | None = None
 
     def create_run(self, task_card: dict[str, Any]) -> str:
         """Initialize a new run directory and state."""
@@ -193,25 +195,34 @@ class Orchestrator:
     ) -> dict[str, Any]:
         """Execute the full pipeline."""
         self.create_run(task_card)
-        state = self._state_manager.load()  # type: ignore[union-attr]
-        stages = state["plan"]["stages"]
-
-        for stage in stages:
-            if stage in {Stage.INIT.value, Stage.DONE.value}:
-                continue
-            state = self._execute_stage(stage, progress=progress)
-            if state["status"] == "aborted":
-                break
-
-        state = self._state_manager.load()  # type: ignore[union-attr]
-        if state["status"] != "aborted":
-            self._state_manager.mark_stage_complete(Stage.DONE.value)  # type: ignore[union-attr]
+        assert self._run_dir is not None
+        lock = RunLock(self._run_dir)
+        if not lock.acquire():
+            raise RuntimeError(f"Run is already active: {self._run_dir}")
+        self._run_lock = lock
+        try:
             state = self._state_manager.load()  # type: ignore[union-attr]
-            state["current_stage"] = Stage.DONE.value
-            state["status"] = "done"
-            self._state_manager.save(state)  # type: ignore[union-attr]
+            stages = state["plan"]["stages"]
 
-        return self._state_manager.load()  # type: ignore[union-attr]
+            for stage in stages:
+                if stage in {Stage.INIT.value, Stage.DONE.value}:
+                    continue
+                state = self._execute_stage(stage, progress=progress)
+                if state["status"] == "aborted":
+                    break
+
+            state = self._state_manager.load()  # type: ignore[union-attr]
+            if state["status"] != "aborted":
+                self._state_manager.mark_stage_complete(Stage.DONE.value)  # type: ignore[union-attr]
+                state = self._state_manager.load()  # type: ignore[union-attr]
+                state["current_stage"] = Stage.DONE.value
+                state["status"] = "done"
+                self._state_manager.save(state)  # type: ignore[union-attr]
+
+            return self._state_manager.load()  # type: ignore[union-attr]
+        finally:
+            self._run_lock = None
+            lock.release()
 
     def resume(
         self,
@@ -234,39 +245,55 @@ class Orchestrator:
         self._evidence_store = EvidenceStore(self._run_dir)
         self._decision_store = DecisionStore(self._run_dir)
         self._human_gate = HumanGate(self._run_dir)
-        if from_stage:
-            self._state_manager.rewind_to(from_stage.strip().upper(), force=force)
-        if agent_display:
-            self._apply_agent_display(agent_display)
-        state = self._state_manager.resume()
-        if state["status"] in {"aborted", "paused"}:
-            state["status"] = "running"
-            self._state_manager.save(state)
-        budget_profile = state.get("plan", {}).get("budget_profile", "default")
-        self._budget = Budget(**self._load_budget_cfg(budget_profile))
-        stages = state["plan"]["stages"]
-        current = state["current_stage"]
-        started = False
-        for stage in stages:
-            if stage == current:
-                started = True
-            if not started or stage in {Stage.INIT.value, Stage.DONE.value}:
-                continue
-            state = self._execute_stage(stage, progress=progress)
-            if state["status"] == "aborted":
-                break
-        state = self._state_manager.load()
-        if state["status"] != "aborted" and all(
-            stage in state.get("completed_stages", [])
-            for stage in stages
-            if stage not in {Stage.INIT.value, Stage.DONE.value}
-        ):
-            self._state_manager.mark_stage_complete(Stage.DONE.value)
+        lock = RunLock(self._run_dir)
+        if not lock.acquire():
+            pid = lock.owner_pid()
+            where = f" (pid {pid})" if pid else ""
+            raise RuntimeError(
+                f"Run is active{where}; stop that process before resuming"
+            )
+        self._run_lock = lock
+        try:
+            if from_stage:
+                self._state_manager.rewind_to(
+                    from_stage.strip().upper(),
+                    force=force,
+                    active=False,
+                )
+            if agent_display:
+                self._apply_agent_display(agent_display)
+            state = self._state_manager.resume()
+            if state["status"] in {"aborted", "paused"}:
+                state["status"] = "running"
+                self._state_manager.save(state)
+            budget_profile = state.get("plan", {}).get("budget_profile", "default")
+            self._budget = Budget(**self._load_budget_cfg(budget_profile))
+            stages = state["plan"]["stages"]
+            current = state["current_stage"]
+            started = False
+            for stage in stages:
+                if stage == current:
+                    started = True
+                if not started or stage in {Stage.INIT.value, Stage.DONE.value}:
+                    continue
+                state = self._execute_stage(stage, progress=progress)
+                if state["status"] == "aborted":
+                    break
             state = self._state_manager.load()
-            state["current_stage"] = Stage.DONE.value
-            state["status"] = "done"
-            self._state_manager.save(state)
-        return self._state_manager.load()  # type: ignore[union-attr]
+            if state["status"] != "aborted" and all(
+                stage in state.get("completed_stages", [])
+                for stage in stages
+                if stage not in {Stage.INIT.value, Stage.DONE.value}
+            ):
+                self._state_manager.mark_stage_complete(Stage.DONE.value)
+                state = self._state_manager.load()
+                state["current_stage"] = Stage.DONE.value
+                state["status"] = "done"
+                self._state_manager.save(state)
+            return self._state_manager.load()  # type: ignore[union-attr]
+        finally:
+            self._run_lock = None
+            lock.release()
 
     def _apply_agent_display(self, overrides: dict[str, Any]) -> None:
         """Persist CLI agent-display overrides into the run's task card and state."""

@@ -84,7 +84,8 @@ INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STA
    - 每阶段完成即持久化，异常中断不丢已做工作。
    - `--from-stage <STAGE>`：把已完成/中断的 run 回退到指定阶段，保留更早阶段产物，
      重跑该阶段及后续；回退前先备份 `state/run_state.rewind-*.json`。
-     运行状态仍为 `running` 时必须先停掉进程或显式 `--force`。
+   - 进程存活用 `state/run.lock` 的内核 `flock` 判定：锁被占用 → 拒绝（先停进程）；
+     锁已释放但状态仍是 `running` → 视为中断，自动允许回退。
 
 6. **反证审查（CandidateVerifier，M7）**
    - 对 Top-K 候选跑 10 问清单，规则推导出裁决动作：`ACCEPT` / `DOWNGRADE` / `REJECT` / `NEED_DYNAMIC`。

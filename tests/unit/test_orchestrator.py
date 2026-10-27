@@ -271,6 +271,15 @@ def test_state_manager_rewind_requires_force_while_running(tmp_path: Path) -> No
     assert sm.rewind_to("A", force=True)["current_stage"] == "A"
 
 
+def test_state_manager_rewind_allows_stale_running(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-007")
+    sm.init({"task_id": "run-007"}, {"stages": ["INIT", "A", "B", "DONE"]})
+    state = sm.rewind_to("A", active=False)
+    assert state["status"] == "running"
+    assert state["current_stage"] == "A"
+    assert state["metadata"]["last_rewind"]["stale_running"] is True
+
+
 def test_state_manager_rewind_requires_a_plan(tmp_path: Path) -> None:
     sm = StateManager(tmp_path / "run-006")
     sm.init({"task_id": "run-006"}, {"stages": ["INIT", "A", "DONE"]})

@@ -990,7 +990,7 @@ def explain(
 @click.option(
     "--force",
     is_flag=True,
-    help="Allow rewinding a run whose state is still marked running.",
+    help="Allow rewinding a stale 'running' marker; a live run lock is never overridden.",
 )
 @click.option("--json-output", is_flag=True)
 @click.option(

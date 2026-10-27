@@ -13,7 +13,8 @@ import pytest
 from click.testing import CliRunner
 
 from fsa.cli import main
-from fsa.utils.jsonio import load_json, save_yaml
+from fsa.utils.jsonio import load_json, save_json, save_yaml
+from fsa.utils.runlock import RunLock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "fixtures"))
 from elf_builder import write_elf64  # noqa: E402
@@ -243,6 +244,105 @@ def test_cli_resume_applies_agent_display_overrides() -> None:
         state = load_json(run / "state" / "run_state.json")
         assert state["task_card"]["agent"]["progress"]["show_model"] is True
         assert state["status"] == "done"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_resume_treats_released_lock_as_interrupted() -> None:
+    workspace = (Path("tmp") / f"cli-stale-run-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        runner = CliRunner()
+        run_id = "stale-run"
+        first = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--depth",
+                "quick",
+                "--authorization-holder",
+                "fixture-owner",
+                "--agent",
+                "--run-id",
+                run_id,
+            ],
+        )
+        assert first.exit_code == 0, first.output
+        run = workspace / "runs" / run_id
+        state = load_json(run / "state" / "run_state.json")
+        state["status"] = "running"
+        state["current_stage"] = "AGENT_LOOP"
+        save_json(run / "state" / "run_state.json", state)
+
+        second = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "resume",
+                run_id,
+                "--from-stage",
+                "AGENT_LOOP",
+                "--no-progress",
+                "--json-output",
+            ],
+        )
+        assert second.exit_code == 0, second.output
+        state = load_json(run / "state" / "run_state.json")
+        assert state["status"] == "done"
+        assert state["metadata"]["last_rewind"]["stale_running"] is True
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_resume_refuses_when_run_lock_is_held() -> None:
+    workspace = (Path("tmp") / f"cli-locked-run-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        runner = CliRunner()
+        run_id = "locked-run"
+        first = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--depth",
+                "quick",
+                "--authorization-holder",
+                "fixture-owner",
+                "--run-id",
+                run_id,
+            ],
+        )
+        assert first.exit_code == 0, first.output
+        run = workspace / "runs" / run_id
+        lock = RunLock(run)
+        assert lock.acquire() is True
+        try:
+            second = runner.invoke(
+                main,
+                [
+                    "--config",
+                    str(config),
+                    "resume",
+                    run_id,
+                    "--no-progress",
+                    "--json-output",
+                ],
+            )
+            assert second.exit_code != 0
+            assert "Run is active" in second.output
+        finally:
+            lock.release()
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

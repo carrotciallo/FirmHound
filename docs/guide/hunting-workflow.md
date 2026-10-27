@@ -299,6 +299,8 @@ fsa report hunt1 --limit 20
 - `AGENT_LOOP` 已执行的动作、模型调用、token、回退与 limitations
 - 缺失产物和恢复命令 `fsa resume <run-id>`；如果 run 已经标成 done，用
   `fsa resume <run-id> --from-stage <STAGE>` 回退到指定阶段重跑（会先备份 `run_state.json`）
+- 如果进程被 kill 但状态还写着 `running`：`state/run.lock` 的 `flock` 会随进程退出自动释放，
+  `fsa resume` 会把这种状态判定为中断并直接续跑；只有锁仍被另一个进程持有时才会拒绝
 
 它不会写 `report.md` 或 `final_verdict.json`，也不会把未验证候选说成确认漏洞。
 恢复完成后，仍以最终 `report.md` 为准。

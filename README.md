@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-456%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-459%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -69,7 +69,7 @@
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，456 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，459 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -286,6 +286,10 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
 | `python scripts/run_e2e.py --fixture-mode ...` | 合成样本回归（必须显式确认 fixture 模式） | 演练产物 |
 | `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
+
+> 续跑判定使用 `runs/<id>/state/run.lock` 的内核 `flock`：锁被占用说明确实有进程在跑；
+> 进程被 kill/崩溃后锁由内核自动释放，此时即使 `run_state.json` 还是 `status=running`，
+> `fsa resume ... --from-stage <STAGE>` 也会按中断处理，不需要 `--force`。
 
 ### 实时进度
 
