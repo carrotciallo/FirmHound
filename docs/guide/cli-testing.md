@@ -92,6 +92,8 @@ cat progress.log            # 含 [n/total] STAGE 开始行与 ok/degraded 结�
   （每 `--agent-progress-every` 步一条，重定向时每秒最多一条）
 - `--agent-show-tokens` 时明细含 `tok <used>/<limit>` 与 `calls <used>/<limit>`；
   `--no-agent-show-tokens` 时两者都不出现
+- 终端里明细按宽度自动换行成普通行，状态行只有一行；明细长度超过终端宽度时
+  不得出现状态行反复覆盖/残留
 - `--progress-interval 0.2` 只改变刷新频率，不改变阶段结果
 - `--agent-print-model` 只在模型实际参与动作选择时输出经过校验的
   `model chose <action> (confidence ...): <reason>`；默认关闭，且不输出原始 prompt/回复

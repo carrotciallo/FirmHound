@@ -2,11 +2,17 @@
 
 This module is display-only: it never changes what a stage does. Progress is
 written to stderr so that ``--json-output`` on stdout stays machine-readable.
+
+On a terminal, detailed updates are printed as normal (auto-wrapped) lines and
+a single short status line is refreshed underneath them. Long details therefore
+never wrap into the refresh area and fill the screen with repeated output.
 """
 
 from __future__ import annotations
 
+import os
 import sys
+import textwrap
 import threading
 import time
 from collections.abc import Iterator
@@ -37,11 +43,11 @@ class PipelineProgress(Protocol):
 
 
 class StageProgress:
-    """Render stage start/end lines, with a live timer on a terminal.
+    """Print detailed updates as lines and keep one live status line.
 
-    On a TTY the current stage is rewritten in place every half second; when
-    stderr is redirected, one start line and one end line are written instead
-    so background logs still show forward motion.
+    On a TTY the status line is rewritten in place; details and notes are
+    written above it as normal lines, wrapped to the terminal width. When
+    stderr is redirected there is no status line: each event is one log line.
     """
 
     def __init__(
@@ -80,13 +86,11 @@ class StageProgress:
         self._started = time.monotonic()
         self._detail = ""
         self._detail_written = 0.0
-        line = self._line("running", None)
         with self._lock:
             if self._tty:
-                self._write("\r" + line)
-                self._width = len(line)
+                self._draw_status("running", None)
             else:
-                self._write(line + "\n")
+                self._write(f"{self._context()}running\n")
         if self._tty:
             self._stop.clear()
             self._thread = threading.Thread(
@@ -95,89 +99,118 @@ class StageProgress:
             self._thread.start()
 
     def stage_end(self, stage: str, status: str, duration: float) -> None:
-        """Finish the active stage line with its status and duration."""
+        """Finish the active stage with a normal, wrapped summary line."""
         if not self.enabled:
             return
         if self._thread is not None:
             self._stop.set()
             self._thread.join(timeout=1.0)
             self._thread = None
-        line = self._line(status, duration)
+        line = f"{self._context()}{status}  {duration:.1f}s"
+        if self._detail:
+            line += f"  · {self._detail}"
         with self._lock:
             if self._tty:
-                padding = " " * max(0, self._width - len(line))
-                self._write("\r" + line + padding + "\n")
+                self._clear_status()
+                for chunk in self._wrap(line):
+                    self._write(chunk + "\n")
                 self._width = 0
             else:
                 self._write(line + "\n")
             self._detail = ""
 
     def detail(self, text: str) -> None:
-        """Show tool-level detail beside the active stage.
+        """Show tool-level detail as a (wrapped) content line.
 
-        On a terminal the detail is folded into the refreshed line. When stderr
-        is redirected, at most one detail line per second is written so long
+        On a TTY the line is printed above the live status line. When stderr is
+        redirected, at most one detail line per second is written so long
         stages remain visible in logs without flooding them.
         """
         if not self.enabled or not self._stage:
             return
-        text = _clean_text(text, _MAX_DETAIL)
-        if not text:
+        message = _clean_text(text, _MAX_DETAIL)
+        if not message:
             return
         with self._lock:
-            self._detail = text
+            self._detail = message
             if self._tty:
+                self._clear_status()
+                for chunk in self._wrap(f"{self._context()}{message}"):
+                    self._write(chunk + "\n")
+                self._draw_status("running", time.monotonic() - self._started)
                 return
             now = time.monotonic()
             if now - self._detail_written < 1.0:
                 return
             self._detail_written = now
-            counter = f"[{self._index}/{self._total}]"
-            self._write(f"{self.prefix}{counter} {self._stage}  {text}\n")
+            self._write(f"{self._context()}{message}\n")
 
     def note(self, text: str) -> None:
-        """Print a one-off note without disturbing the live stage line."""
+        """Print a one-off note without disturbing the live status line."""
         if not self.enabled:
             return
         message = _clean_text(text, _MAX_DETAIL)
         if not message:
             return
         with self._lock:
-            context = (
-                f"[{self._index}/{self._total}] {self._stage}  "
-                if self._stage
-                else ""
-            )
-            line = f"{self.prefix}{context}{message}\n"
-            if self._tty and self._stage:
-                self._write("\r" + " " * self._width + "\r" + line)
-                current = self._line("running", time.monotonic() - self._started)
-                self._write("\r" + current)
-                self._width = max(self._width, len(current))
+            context = self._context() if self._stage else self.prefix
+            if self._tty:
+                self._clear_status()
+                for chunk in self._wrap(f"{context}{message}"):
+                    self._write(chunk + "\n")
+                if self._stage:
+                    self._draw_status("running", time.monotonic() - self._started)
             else:
-                self._write(line)
+                self._write(f"{context}{message}\n")
+
+    def _context(self) -> str:
+        if not self._stage:
+            return self.prefix
+        return f"{self.prefix}[{self._index}/{self._total}] {self._stage}  "
+
+    def _wrap(self, text: str) -> list[str]:
+        width = max(20, self._terminal_width() - 1)
+        if len(text) <= width:
+            return [text]
+        return textwrap.wrap(
+            text,
+            width=width,
+            break_long_words=True,
+            break_on_hyphens=False,
+            subsequent_indent="  ",
+        ) or [text]
+
+    def _draw_status(self, status: str, elapsed: float | None) -> None:
+        plain = f"{self._context()}{status}"
+        if elapsed is not None:
+            plain += f"  {elapsed:.1f}s"
+        width = self._terminal_width()
+        if len(plain) > width - 1:
+            plain = plain[: max(1, width - 2)] + "…"
+        visible = len(plain)
+        padding = " " * max(0, self._width - visible)
+        text = (
+            console.paint(plain, console.BOLD_CYAN, enabled=True)
+            if self._colour
+            else plain
+        )
+        self._write("\r" + text + padding)
+        self._width = max(self._width, visible)
+
+    def _clear_status(self) -> None:
+        self._write("\r" + " " * self._width + "\r")
+        self._width = 0
 
     def _tick(self) -> None:
         while not self._stop.wait(self.interval):
-            elapsed = time.monotonic() - self._started
-            line = self._line("running", elapsed)
             with self._lock:
-                padding = " " * max(0, self._width - len(line))
-                self._write("\r" + line + padding)
-                self._width = max(self._width, len(line))
+                self._draw_status("running", time.monotonic() - self._started)
 
-    def _line(self, status: str, elapsed: float | None) -> str:
-        counter = f"[{self._index}/{self._total}]"
-        stage = console.paint(self._stage, console.BOLD_CYAN, enabled=self._colour)
-        word = console.paint(
-            status,
-            console.STATUS_COLOURS.get(status, console.DIM),
-            enabled=self._colour,
-        )
-        suffix = f"  · {self._detail}" if self._detail else ""
-        if elapsed is None:
-            return f"{self.prefix}{counter} {stage}  {word}{suffix}"
-        return f"{self.prefix}{counter} {stage}  {word}  {elapsed:.1f}s{suffix}"
+    def _terminal_width(self) -> int:
+        try:
+            return max(20, os.get_terminal_size(self.stream.fileno()).columns)
+        except (OSError, ValueError, AttributeError):
+            return 100
 
     def _write(self, text: str) -> None:
         try:

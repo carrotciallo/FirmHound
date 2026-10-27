@@ -57,11 +57,17 @@ v1 不在 loop 内运行 BOND；BOND 仍在 `CONSTRAINED_VALIDATION` 阶段。
 
 ## 进度显示
 
-`AGENT_LOOP` 默认每 10 步向 stderr 输出一条明细：
+`AGENT_LOOP` 默认每 10 步向 stderr 输出一条明细。终端里明细按内容自动换行，
+底部只保留一行原地刷新的状态行：
 
 ```text
-[5/12] AGENT_LOOP  running  42.1s  · agent step 123/5000 · cand-c32784f3ddeb · cross_check_imports_strings · selector=model · tok 12400/2000000 · calls 45/2000 · ev 515 · missing 2 · resolved 8/484 · skipped 12
+[5/12] AGENT_LOOP  agent step 123/5000 · cand-c32784f3ddeb ·
+  cross_check_imports_strings · selector=model · tok 12400/2000000 ·
+  calls 45/2000 · ev 515 · missing 2 · resolved 8/484 · skipped 12
+[5/12] AGENT_LOOP  running  42.1s
 ```
+
+长明细不会再写进刷新行，因此不会出现换行后反复覆盖、把终端刷满的问题。
 
 | 参数 | 默认 | 作用 |
 |---|---|---|
