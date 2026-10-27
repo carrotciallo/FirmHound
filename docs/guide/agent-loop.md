@@ -55,6 +55,34 @@ v1 不在 loop 内运行 BOND；BOND 仍在 `CONSTRAINED_VALIDATION` 阶段。
 `--agent-max-steps-per-candidate`、`--agent-max-tool-calls`、
 `--agent-max-seconds`、`--agent-no-progress-limit`。
 
+## 进度显示
+
+`AGENT_LOOP` 默认每 10 步向 stderr 输出一条明细：
+
+```text
+[5/12] AGENT_LOOP  running  42.1s  · agent step 123/5000 · cand-c32784f3ddeb · cross_check_imports_strings · selector=model · tok 12400/2000000 · calls 45/2000 · ev 515 · missing 2 · resolved 8/484 · skipped 12
+```
+
+| 参数 | 默认 | 作用 |
+|---|---|---|
+| `--progress-interval` | `0.5` | 终端刷新间隔（秒） |
+| `--agent-progress-every` | `10` | 每 N 步汇报一次 |
+| `--agent-show-tokens` / `--no-agent-show-tokens` | 显示 | token 与模型调用计数 |
+| `--agent-print-model` / `--no-agent-print-model` | 关闭 | 打印已校验的模型选择（动作/置信度/理由） |
+
+```bash
+fsa analyze <rootfs> --authorization-holder "设备所有者" --agent --progress \
+  --progress-interval 0.2 --agent-progress-every 25 \
+  --agent-show-tokens --agent-print-model
+```
+
+- 进度只写 stderr；`--json-output` 的 stdout 不受影响。
+- `--agent-print-model` 不打印原始 prompt、原始回复、思维链或候选正文；只打印
+  `parse_model_choice` 校验后的动作、置信度和截断理由。
+- 这些设置也可写在 `config/dev.yaml` 的 `agent.progress`；`resume` 时 CLI 参数会
+  覆盖并持久化到该 run 的 task card。
+- 重定向/CI 下不刷新单行计时，只输出阶段开始/结束行和每秒最多一条 Agent 明细。
+
 ## AI 服务配置
 
 模型服务分三层，不要全部塞进 `config/dev.yaml`：

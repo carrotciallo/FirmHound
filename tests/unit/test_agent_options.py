@@ -78,3 +78,29 @@ def test_out_of_range_rejected() -> None:
 def test_unknown_key_rejected() -> None:
     with pytest.raises(jsonschema.ValidationError):
         resolve_agent_options({"unexpected": True})
+
+
+def test_progress_defaults_are_visible() -> None:
+    options = resolve_agent_options({})
+    assert options["progress"] == {
+        "every_steps": 10,
+        "show_tokens": True,
+        "show_model": False,
+    }
+
+
+def test_progress_overrides_merge_with_defaults() -> None:
+    options = resolve_agent_options(
+        {},
+        {"progress": {"every_steps": 25, "show_model": True}},
+    )
+    assert options["progress"] == {
+        "every_steps": 25,
+        "show_tokens": True,
+        "show_model": True,
+    }
+
+
+def test_progress_out_of_range_rejected() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        resolve_agent_options({}, {"progress": {"every_steps": 0}})

@@ -144,6 +144,17 @@ def _agent_overrides(**values: Any) -> dict[str, Any]:
             klee[config_key] = value
     if klee:
         overrides.setdefault("external", {}).setdefault("klee", {}).update(klee)
+    display: dict[str, Any] = {}
+    for cli_key, config_key in (
+        ("agent_progress_every", "every_steps"),
+        ("agent_show_tokens", "show_tokens"),
+        ("agent_print_model", "show_model"),
+    ):
+        value = values.get(cli_key)
+        if value is not None:
+            display[config_key] = value
+    if display:
+        overrides.setdefault("progress", {}).update(display)
     return overrides
 
 
@@ -346,6 +357,29 @@ def plan(
     help="Show live stage progress on stderr (default: on unless --json-output).",
 )
 @click.option(
+    "--progress-interval",
+    type=click.FloatRange(0.1, 10.0),
+    default=0.5,
+    show_default=True,
+    help="Seconds between progress refreshes.",
+)
+@click.option(
+    "--agent-progress-every",
+    type=click.IntRange(1, 500),
+    default=None,
+    help="Report AGENT_LOOP progress every N steps (default: 10).",
+)
+@click.option(
+    "--agent-show-tokens/--no-agent-show-tokens",
+    default=None,
+    help="Include token and model-call counters in agent progress (default: on).",
+)
+@click.option(
+    "--agent-print-model/--no-agent-print-model",
+    default=None,
+    help="Print the validated model action choice to stderr (default: off).",
+)
+@click.option(
     "--blind/--no-blind",
     default=False,
     show_default=True,
@@ -367,6 +401,10 @@ def analyze(
     run_id: str | None,
     json_output: bool,
     progress: bool | None,
+    progress_interval: float,
+    agent_progress_every: int | None,
+    agent_show_tokens: bool | None,
+    agent_print_model: bool | None,
     blind: bool,
     agent: bool | None,
     agent_tier: str | None,
@@ -421,6 +459,9 @@ def analyze(
             agent_klee_max_forks=agent_klee_max_forks,
             agent_klee_max_depth=agent_klee_max_depth,
             agent_klee_solver=agent_klee_solver,
+            agent_progress_every=agent_progress_every,
+            agent_show_tokens=agent_show_tokens,
+            agent_print_model=agent_print_model,
         ),
     }
 
@@ -435,6 +476,7 @@ def analyze(
             index,
             len(targets),
             progress=show_progress,
+            progress_interval=progress_interval,
         )
         results.append(result)
         _report_result(result, json_output, index, len(targets))
@@ -483,6 +525,7 @@ def _analyse_one(
     total: int,
     *,
     progress: bool = False,
+    progress_interval: float = 0.5,
 ) -> dict[str, Any]:
     """Run one input and return a result record, never raising on analysis failure."""
     result: dict[str, Any] = {
@@ -527,6 +570,7 @@ def _analyse_one(
         reporter = StageProgress(
             enabled=progress,
             prefix=f"[{task_card['task_id']}] " if total > 1 else "",
+            interval=progress_interval,
         )
         state = orchestrator.run(task_card, progress=reporter)
     except Exception as exc:  # noqa: BLE001
@@ -954,6 +998,29 @@ def explain(
     default=None,
     help="Show live stage progress on stderr (default: on unless --json-output).",
 )
+@click.option(
+    "--progress-interval",
+    type=click.FloatRange(0.1, 10.0),
+    default=0.5,
+    show_default=True,
+    help="Seconds between progress refreshes.",
+)
+@click.option(
+    "--agent-progress-every",
+    type=click.IntRange(1, 500),
+    default=None,
+    help="Report AGENT_LOOP progress every N steps (default: keep stored setting).",
+)
+@click.option(
+    "--agent-show-tokens/--no-agent-show-tokens",
+    default=None,
+    help="Include token and model-call counters in agent progress.",
+)
+@click.option(
+    "--agent-print-model/--no-agent-print-model",
+    default=None,
+    help="Print the validated model action choice to stderr (default: off).",
+)
 @click.pass_context
 def resume(
     ctx: click.Context,
@@ -962,15 +1029,28 @@ def resume(
     force: bool,
     json_output: bool,
     progress: bool | None,
+    progress_interval: float,
+    agent_progress_every: int | None,
+    agent_show_tokens: bool | None,
+    agent_print_model: bool | None,
 ) -> None:
     """Resume an interrupted run, or rewind a finished run with --from-stage."""
     show_progress = progress if progress is not None else not json_output
+    agent_display = _agent_overrides(
+        agent_progress_every=agent_progress_every,
+        agent_show_tokens=agent_show_tokens,
+        agent_print_model=agent_print_model,
+    ).get("progress")
     try:
         state = Orchestrator(config_path=ctx.obj["config"]).resume(
             run_id,
             from_stage=from_stage,
             force=force,
-            progress=StageProgress(enabled=show_progress),
+            progress=StageProgress(
+                enabled=show_progress,
+                interval=progress_interval,
+            ),
+            agent_display=agent_display,
         )
     except Exception as exc:  # noqa: BLE001
         raise click.ClickException(str(exc)) from exc

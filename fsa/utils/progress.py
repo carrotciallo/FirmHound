@@ -17,6 +17,13 @@ from typing import Protocol, TextIO
 from fsa.utils import console
 
 _TICK_SECONDS = 0.5
+_MAX_DETAIL = 400
+
+
+def _clean_text(text: object, limit: int) -> str:
+    """Collapse whitespace and drop control characters before terminal output."""
+    printable = "".join(ch if ch.isprintable() else " " for ch in str(text))
+    return " ".join(printable.split())[:limit]
 
 
 class PipelineProgress(Protocol):
@@ -43,11 +50,13 @@ class StageProgress:
         enabled: bool = True,
         stream: TextIO | None = None,
         prefix: str = "",
+        interval: float = _TICK_SECONDS,
     ) -> None:
         """Create a reporter bound to ``stream`` (stderr by default)."""
         self.stream = stream if stream is not None else sys.stderr
         self.enabled = bool(enabled)
         self.prefix = prefix
+        self.interval = max(0.1, float(interval))
         self._tty = bool(getattr(self.stream, "isatty", lambda: False)())
         self._colour = console.use_colour(self.stream)
         self._lock = threading.Lock()
@@ -112,7 +121,7 @@ class StageProgress:
         """
         if not self.enabled or not self._stage:
             return
-        text = " ".join(str(text).split())[:120]
+        text = _clean_text(text, _MAX_DETAIL)
         if not text:
             return
         with self._lock:
@@ -126,8 +135,30 @@ class StageProgress:
             counter = f"[{self._index}/{self._total}]"
             self._write(f"{self.prefix}{counter} {self._stage}  {text}\n")
 
+    def note(self, text: str) -> None:
+        """Print a one-off note without disturbing the live stage line."""
+        if not self.enabled:
+            return
+        message = _clean_text(text, _MAX_DETAIL)
+        if not message:
+            return
+        with self._lock:
+            context = (
+                f"[{self._index}/{self._total}] {self._stage}  "
+                if self._stage
+                else ""
+            )
+            line = f"{self.prefix}{context}{message}\n"
+            if self._tty and self._stage:
+                self._write("\r" + " " * self._width + "\r" + line)
+                current = self._line("running", time.monotonic() - self._started)
+                self._write("\r" + current)
+                self._width = max(self._width, len(current))
+            else:
+                self._write(line)
+
     def _tick(self) -> None:
-        while not self._stop.wait(_TICK_SECONDS):
+        while not self._stop.wait(self.interval):
             elapsed = time.monotonic() - self._started
             line = self._line("running", elapsed)
             with self._lock:
@@ -182,3 +213,10 @@ def report_detail(text: str) -> None:
     progress = _current_progress.get()
     if progress is not None:
         progress.detail(text)
+
+
+def report_note(text: str) -> None:
+    """Print a one-off note from tool code (no-op when no progress is active)."""
+    progress = _current_progress.get()
+    if progress is not None:
+        progress.note(text)

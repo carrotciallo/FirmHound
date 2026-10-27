@@ -157,10 +157,24 @@ fsa analyze tmp/unpacked/_DIR-859_Ax_FW_113b03.bin.extracted/squashfs-root \
 [2/11] BASELINE  ok  0.0s
 [3/11] UNPACK  running  6.4s
 [4/11] SURFACE  ok  1.2s
-[5/12] AGENT_LOOP  running  42.1s  · agent step 120 · cand-c32784f3ddeb · cross_check_imports_strings
+[5/12] AGENT_LOOP  running  42.1s  · agent step 123/5000 · cand-c32784f3ddeb · cross_check_imports_strings · selector=model · tok 12400/2000000 · calls 45/2000 · ev 515 · missing 2 · resolved 8/484 · skipped 12
 ```
 
-最后一行是 `--agent` 时的效果：Agent 每 10 步汇报一次当前候选和动作。
+最后一行是 `--agent` 时的效果：Agent 每 10 步汇报一次当前候选、动作、token/调用数、
+证据数和候选进度。可以调整：
+
+```bash
+# 0.2 秒刷新；每 25 步汇报；显示 token；打印模型选择
+fsa analyze <rootfs> --authorization-holder "设备所有者" --agent --progress \
+  --progress-interval 0.2 --agent-progress-every 25 \
+  --agent-show-tokens --agent-print-model
+
+# 不显示 token / 不打印模型选择
+... --no-agent-show-tokens --no-agent-print-model
+```
+
+`--agent-print-model` 只打印已验证的模型选择（动作、置信度、理由），不打印原始
+prompt、原始回复或思维链。
 
 后台跑时把进度写进日志，再用 `tail -f` 看：
 

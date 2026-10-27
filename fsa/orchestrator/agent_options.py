@@ -30,6 +30,11 @@ DEFAULT_AGENT_OPTIONS: dict[str, Any] = {
         "max_tokens": 4000,
         "allow_public": False,
     },
+    "progress": {
+        "every_steps": 10,
+        "show_tokens": True,
+        "show_model": False,
+    },
     "dynamic": {
         "enabled": False,
         "require_authorized_emulation": True,

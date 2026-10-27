@@ -152,6 +152,101 @@ def test_cli_analyze_progress_flag_prints_stage_lines() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def test_cli_agent_progress_shows_tokens_and_can_hide_them() -> None:
+    workspace = (Path("tmp") / f"cli-agent-progress-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        runner = CliRunner()
+        base = [
+            "--config",
+            str(config),
+            "analyze",
+            str(rootfs),
+            "--depth",
+            "quick",
+            "--authorization-holder",
+            "fixture-owner",
+            "--agent",
+            "--progress",
+            "--progress-interval",
+            "0.1",
+        ]
+
+        shown = runner.invoke(main, [*base, "--run-id", "agent-progress-on"])
+        assert shown.exit_code == 0, shown.output
+        assert "agent step " in shown.output
+        assert "tok " in shown.output
+        assert "resolved " in shown.output
+
+        hidden = runner.invoke(
+            main,
+            [*base, "--run-id", "agent-progress-off", "--no-agent-show-tokens"],
+        )
+        assert hidden.exit_code == 0, hidden.output
+        assert "agent step " in hidden.output
+        assert "tok " not in hidden.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_resume_applies_agent_display_overrides() -> None:
+    workspace = (Path("tmp") / f"cli-resume-display-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        runner = CliRunner()
+        run_id = "resume-display"
+        first = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--depth",
+                "quick",
+                "--authorization-holder",
+                "fixture-owner",
+                "--agent",
+                "--run-id",
+                run_id,
+            ],
+        )
+        assert first.exit_code == 0, first.output
+
+        second = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "resume",
+                run_id,
+                "--from-stage",
+                "AGENT_LOOP",
+                "--no-agent-show-tokens",
+                "--agent-print-model",
+                "--no-progress",
+                "--json-output",
+            ],
+        )
+        assert second.exit_code == 0, second.output
+        run = workspace / "runs" / run_id
+        task = load_json(run / "state" / "task_card.json")
+        assert task["agent"]["progress"] == {
+            "every_steps": 10,
+            "show_tokens": False,
+            "show_model": True,
+        }
+        state = load_json(run / "state" / "run_state.json")
+        assert state["task_card"]["agent"]["progress"]["show_model"] is True
+        assert state["status"] == "done"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def test_cli_resume_from_stage_rewinds_finished_run() -> None:
     workspace = (Path("tmp") / f"cli-rewind-test-{uuid.uuid4().hex}").resolve()
     workspace.mkdir(parents=True)

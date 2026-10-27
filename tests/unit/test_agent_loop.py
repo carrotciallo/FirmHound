@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from fsa.orchestrator import agent_loop
 from fsa.orchestrator.agent_options import resolve_agent_options
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import load_json, save_json
+from fsa.utils.progress import StageProgress, use_progress
 
 
 def _candidate(**overrides: Any) -> dict[str, Any]:
@@ -138,6 +140,43 @@ def test_static_actions_run_and_trace_validates(tmp_path: Path) -> None:
     assert "cross_check_imports_strings" in trace["summary"]["actions"]
     assert trace["candidates"][0]["actions_attempted"]
     assert (run / "artifacts" / "ranking.json").is_file()
+
+
+def test_progress_detail_includes_tokens_candidates_and_evidence(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    stream = io.StringIO()
+    progress = StageProgress(enabled=True, stream=stream)
+    progress.stage_start("AGENT_LOOP", 5, 10)
+    with use_progress(progress):
+        agent_loop.run_agent_loop(
+            run, options=_options(), config={"runtime": {"default": "mock"}}
+        )
+    progress.stage_end("AGENT_LOOP", "ok", 1.0)
+
+    text = stream.getvalue()
+    assert "agent step " in text
+    assert "selector=" in text
+    assert "tok " in text
+    assert "calls " in text
+    assert "ev " in text
+    assert "resolved " in text
+    assert "skipped " in text
+
+
+def test_progress_can_hide_token_counters(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    stream = io.StringIO()
+    progress = StageProgress(enabled=True, stream=stream)
+    progress.stage_start("AGENT_LOOP", 5, 10)
+    with use_progress(progress):
+        agent_loop.run_agent_loop(
+            run,
+            options=_options(progress={"show_tokens": False}),
+            config={"runtime": {"default": "mock"}},
+        )
+    progress.stage_end("AGENT_LOOP", "ok", 1.0)
+
+    assert "tok " not in stream.getvalue()
 
 
 def test_resume_does_not_duplicate_steps_or_evidence(tmp_path: Path) -> None:

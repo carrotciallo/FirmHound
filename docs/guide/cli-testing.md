@@ -88,8 +88,13 @@ cat progress.log            # 含 [n/total] STAGE 开始行与 ok/degraded 结�
 - `--progress` 只写 stderr；`--json-output` 的 stdout 仍可被 `jq` 解析
 - `--no-progress` 输出中不出现阶段进度行
 - 阶段耗时与状态来自引擎实际执行结果，不是预估
-- 加 `--agent` 时，`progress.log` 里应出现 `agent step N · <candidate> · <action>`
-  （每 10 步一条，重定向时每秒最多一条）
+- 加 `--agent` 时，`progress.log` 里应出现 `agent step N/<max> · <candidate> · <action>`
+  （每 `--agent-progress-every` 步一条，重定向时每秒最多一条）
+- `--agent-show-tokens` 时明细含 `tok <used>/<limit>` 与 `calls <used>/<limit>`；
+  `--no-agent-show-tokens` 时两者都不出现
+- `--progress-interval 0.2` 只改变刷新频率，不改变阶段结果
+- `--agent-print-model` 只在模型实际参与动作选择时输出经过校验的
+  `model chose <action> (confidence ...): <reason>`；默认关闭，且不输出原始 prompt/回复
 
 ## 5. Full Depth 降级
 

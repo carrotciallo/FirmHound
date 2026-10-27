@@ -21,6 +21,7 @@
     "disabled_reason",
     "limitations",
     "model",
+    "progress",
     "dynamic",
     "external"
   ],
@@ -48,6 +49,16 @@
         "max_calls": {"type": "integer", "minimum": 1, "maximum": 2000},
         "max_tokens": {"type": "integer", "minimum": 1, "maximum": 2000000},
         "allow_public": {"type": "boolean"}
+      }
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["every_steps", "show_tokens", "show_model"],
+      "properties": {
+        "every_steps": {"type": "integer", "minimum": 1, "maximum": 500},
+        "show_tokens": {"type": "boolean"},
+        "show_model": {"type": "boolean"}
       }
     },
     "dynamic": {

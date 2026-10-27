@@ -18,8 +18,9 @@ from fsa.runtime import AgentRuntime, Budget, load_runtime
 from fsa.runtime.base import ToolResult
 from fsa.runtime.tool_registry import ToolRegistry
 from fsa.safety.policy_engine import PolicyEngine
+from fsa.schemas.loader import validate
 from fsa.utils.config_files import resolve_config_file
-from fsa.utils.jsonio import load_yaml
+from fsa.utils.jsonio import load_json, load_yaml
 from fsa.utils.progress import use_progress
 
 if TYPE_CHECKING:
@@ -219,6 +220,7 @@ class Orchestrator:
         from_stage: str | None = None,
         force: bool = False,
         progress: PipelineProgress | None = None,
+        agent_display: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Resume a run, optionally rewinding a finished run to ``from_stage``."""
         validate_run_id(run_id)
@@ -234,6 +236,8 @@ class Orchestrator:
         self._human_gate = HumanGate(self._run_dir)
         if from_stage:
             self._state_manager.rewind_to(from_stage.strip().upper(), force=force)
+        if agent_display:
+            self._apply_agent_display(agent_display)
         state = self._state_manager.resume()
         if state["status"] in {"aborted", "paused"}:
             state["status"] = "running"
@@ -263,6 +267,33 @@ class Orchestrator:
             state["status"] = "done"
             self._state_manager.save(state)
         return self._state_manager.load()  # type: ignore[union-attr]
+
+    def _apply_agent_display(self, overrides: dict[str, Any]) -> None:
+        """Persist CLI agent-display overrides into the run's task card and state."""
+        task_path = self._run_dir / "state" / "task_card.json"
+        if not task_path.is_file():
+            return
+        task = load_json(task_path)
+        agent = task.get("agent") if isinstance(task, dict) else None
+        if not isinstance(agent, dict):
+            return
+        progress = agent.get("progress")
+        if not isinstance(progress, dict):
+            progress = {}
+            agent["progress"] = progress
+        progress.setdefault("every_steps", 10)
+        progress.setdefault("show_tokens", True)
+        progress.setdefault("show_model", False)
+        progress.update(overrides)
+        validate(agent, schema_name="agent_options")
+        self.planner.save_task_card(task, self._run_dir)
+        state = self._state_manager.load()
+        state["task_card"] = task
+        plan = state.get("plan")
+        if isinstance(plan, dict) and isinstance(plan.get("agent"), dict):
+            plan["agent"] = agent
+            self.planner.save_plan(plan, self._run_dir)
+        self._state_manager.save(state)
 
     def _execute_stage(
         self,

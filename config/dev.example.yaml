@@ -42,6 +42,10 @@ agent:
     max_calls: 8
     max_tokens: 4000
     allow_public: false     # set true only for an explicitly allowed remote endpoint
+  progress:
+    every_steps: 10         # report agent progress every N steps
+    show_tokens: true       # include token/call counters in the progress line
+    show_model: false       # print the validated model choice (not raw prompt/reply)
   dynamic:
     enabled: false
     require_authorized_emulation: true

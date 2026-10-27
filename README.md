@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-450%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-456%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -69,7 +69,7 @@
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，450 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，456 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -292,9 +292,17 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 `analyze` 和 `resume` 默认把阶段进度写到 **stderr**，stdout 仍是结果/JSON：
 
 ```bash
-# 终端里直接看：当前阶段每 0.5 秒刷新一次计时
+# 终端里直接看：默认每 0.5 秒刷新一次计时
 fsa analyze firmware_samples/DIR859_FW102b03.bin \
   --authorization-holder "设备所有者" --agent --progress
+
+# 调整刷新间隔，并让 Agent 更详细/更稀疏地汇报
+fsa analyze firmware_samples/DIR859_FW102b03.bin \
+  --authorization-holder "设备所有者" --agent --progress \
+  --progress-interval 0.2 \
+  --agent-progress-every 25 \
+  --agent-show-tokens \
+  --agent-print-model
 
 # 后台跑：进度进日志，JSON 结果单独进 stdout
 nohup fsa analyze firmware_samples/DIR859_FW102b03.bin \
@@ -305,19 +313,31 @@ tail -f runs/hunt1.progress.log
 # 从已完成 run 的 REPORT 阶段重跑，同样能看到进度
 fsa resume dir859-ai-full --from-stage REPORT --progress
 
-# 不想要任何进度行
-fsa analyze <rootfs> --authorization-holder "设备所有者" --no-progress
+# 不想要任何进度行 / 不显示 token / 不打印模型选择
+fsa analyze <rootfs> --authorization-holder "设备所有者" \
+  --no-progress --no-agent-show-tokens --no-agent-print-model
 ```
 
-`AGENT_LOOP` 每执行 10 步会把当前候选和动作附在阶段行后面，例如：
+`AGENT_LOOP` 每执行 `--agent-progress-every`（默认 10）步汇报一次，包含当前候选、
+动作、选择者、token/调用计数、证据数、缺失事实和候选进度：
 
 ```text
-[5/12] AGENT_LOOP  running  42.1s  · agent step 120 · cand-c32784f3ddeb · cross_check_imports_strings
+[5/12] AGENT_LOOP  running  42.1s  · agent step 123/5000 · cand-c32784f3ddeb · cross_check_imports_strings · selector=model · tok 12400/2000000 · calls 45/2000 · ev 515 · missing 2 · resolved 8/484 · skipped 12
 ```
 
-非终端（重定向/CI）时不会刷新单行计时，而是输出阶段开始/结束行以及每秒最多一条
-Agent 步骤明细；`--json-output` 默认关闭进度，需要时显式加 `--progress`，进度只走
-stderr，不污染 stdout。
+相关参数：
+
+| 参数 | 默认 | 作用 |
+|---|---|---|
+| `--progress-interval` | `0.5` | 终端刷新间隔（秒，0.1–10） |
+| `--agent-progress-every` | `10` | 每 N 步输出一条 Agent 明细 |
+| `--agent-show-tokens/--no-agent-show-tokens` | 开启 | 显示 token 与模型调用计数 |
+| `--agent-print-model/--no-agent-print-model` | 关闭 | 打印模型选中的动作、置信度和理由；只打印已校验的选择摘要，不打印原始 prompt/回复 |
+
+这些显示选项也可写在 `config/dev.yaml` 的 `agent.progress` 下；`resume` 时传参
+会覆盖并持久化到该 run 的 task card。非终端（重定向/CI）不会刷新单行计时，而是
+输出阶段开始/结束行以及每秒最多一条 Agent 明细；`--json-output` 默认关闭进度，
+需要时显式加 `--progress`，进度只走 stderr，不污染 stdout。
 
 ## 配置说明
 

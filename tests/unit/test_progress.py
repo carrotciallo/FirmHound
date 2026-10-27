@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 
-from fsa.utils.progress import StageProgress, report_detail, use_progress
+from fsa.utils.progress import StageProgress, report_detail, report_note, use_progress
 
 
 def test_stage_progress_writes_start_and_end_when_not_a_tty() -> None:
@@ -49,3 +49,19 @@ def test_tool_detail_reaches_the_active_stage() -> None:
 
 def test_report_detail_without_active_progress_is_a_noop() -> None:
     report_detail("nothing should happen")
+
+
+def test_note_prints_validated_model_line_and_strips_controls() -> None:
+    stream = io.StringIO()
+    progress = StageProgress(enabled=True, stream=stream)
+    progress.stage_start("AGENT_LOOP", 5, 10)
+
+    with use_progress(progress):
+        report_note("model chose verify_auth_hint\n\x1b[31mconfidence 0.8")
+
+    progress.stage_end("AGENT_LOOP", "ok", 1.0)
+
+    text = stream.getvalue()
+    assert "model chose verify_auth_hint" in text
+    assert "\x1b" not in text
+    assert "confidence 0.8" in text

@@ -22,7 +22,7 @@ from fsa.runtime.mock import OfflineRuleRuntime
 from fsa.safety.policy_engine import PolicyEngine
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import load_json, save_json
-from fsa.utils.progress import report_detail
+from fsa.utils.progress import report_detail, report_note
 from tools.analysis.risk_score import rank_candidates
 from tools.audit.agent_actions import ACTION_HANDLERS, build_context
 from tools.pipeline_context import load_artifact, load_task, run_path
@@ -303,6 +303,13 @@ def run_agent_loop(
     )
     budget.begin_stage()
 
+    display = options.get("progress")
+    if not isinstance(display, dict):
+        display = {}
+    every_steps = max(1, int(display.get("every_steps", 10)))
+    show_tokens = bool(display.get("show_tokens", True))
+    show_model = bool(display.get("show_model", False))
+
     states: list[CandidateState] = []
     for candidate in candidates[:max_candidates]:
         if not isinstance(candidate, dict):
@@ -380,6 +387,11 @@ def run_agent_loop(
     deadline = time.monotonic() + max_seconds
     step = len(replayed)
     tool_calls = len(replayed)
+    evidence_total = sum(
+        len(entry.get("evidence_ids", []))
+        for entry in replayed
+        if isinstance(entry, dict)
+    )
     trace["budget"].update(
         {
             "used_candidates": len(states),
@@ -469,9 +481,16 @@ def run_agent_loop(
                         "confidence": confidence,
                         "reason": reason,
                     }
+                    if show_model:
+                        report_note(
+                            f"model chose {chosen.action_id} "
+                            f"(confidence {confidence:.2f}): {reason}"
+                        )
                 else:
                     model_info["fallback_count"] += 1
                     model_info["last_fallback_reason"] = fallback
+                    if show_model:
+                        report_note(f"model fallback: {fallback}")
 
             before = {key: deepcopy(candidate.get(key)) for key in _FORBIDDEN_FIELDS}
             signature_before = _signature(candidate)
@@ -561,12 +580,38 @@ def run_agent_loop(
 
             step += 1
             tool_calls += 1
+            evidence_total += len(evidence_ids)
             candidate_steps[cid] = candidate_steps.get(cid, 0) + 1
             new_steps = step - len(replayed)
-            if new_steps == 1 or new_steps % 10 == 0:
-                report_detail(
-                    f"agent step {new_steps} · {cid} · {chosen.action_id}"
+            if new_steps == 1 or new_steps % every_steps == 0:
+                resolved = sum(
+                    1
+                    for item in states
+                    if not item.missing and not item.skipped and not item.stalled
                 )
+                skipped = sum(1 for item in states if item.skipped)
+                parts = [
+                    f"agent step {step}/{max_steps}",
+                    cid,
+                    chosen.action_id,
+                    f"selector={selector}",
+                ]
+                if show_tokens:
+                    parts.extend(
+                        [
+                            f"tok {budget.stage_tokens_used}/{budget.max_total_tokens}",
+                            f"calls {budget.stage_calls_used}/{budget.max_model_calls_per_stage}",
+                        ]
+                    )
+                parts.extend(
+                    [
+                        f"ev {evidence_total}",
+                        f"missing {len(state.missing)}",
+                        f"resolved {resolved}/{len(states)}",
+                        f"skipped {skipped}",
+                    ]
+                )
+                report_detail(" · ".join(parts))
             elapsed = time.monotonic() - (deadline - max_seconds)
             trace["budget"].update(
                 {
@@ -600,6 +645,19 @@ def run_agent_loop(
         return {"status": "failed", "reason": str(exc), "agent_trace": str(path)}
 
     _finalize_trace(trace, states, stop_reason=stop_reason)
+    summary = trace["summary"]
+    parts = [
+        "done",
+        f"steps {summary['steps']}",
+        stop_reason,
+        f"ev {summary['evidence_added']}",
+        f"resolved {summary['resolved_candidates']}/{len(states)}",
+        f"skipped {summary['skipped_candidates']}",
+    ]
+    if show_tokens:
+        parts.append(f"model {model_info['calls']} calls / {model_info['tokens']} tok")
+    parts.append(f"fallback {model_info['fallback_count']}")
+    report_detail(" · ".join(parts))
     path = _write_trace(run, trace)
     return {
         "status": trace["status"],
