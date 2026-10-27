@@ -227,6 +227,60 @@ def test_state_manager_resume_skips_init_and_finishes(tmp_path: Path) -> None:
     assert state["status"] == "done"
 
 
+def test_state_manager_rewind_to_stage(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-003")
+    stages = ["INIT", "A", "B", "C", "DONE"]
+    sm.init({"task_id": "run-003"}, {"stages": stages})
+    for stage in ("A", "B", "C", "DONE"):
+        sm.mark_stage_complete(stage)
+    state = sm.load()
+    state["status"] = "done"
+    state["current_stage"] = "DONE"
+    sm.save(state)
+
+    rewound = sm.rewind_to("B")
+    assert rewound["status"] == "running"
+    assert rewound["current_stage"] == "B"
+    assert rewound["completed_stages"] == ["A"]
+    rewind = rewound["metadata"]["last_rewind"]
+    assert rewind["from_stage"] == "B"
+    assert Path(rewind["backup"]).is_file()
+    assert sm.resume()["current_stage"] == "B"
+
+
+def test_state_manager_rewind_rejects_bad_stage(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-004")
+    sm.init({"task_id": "run-004"}, {"stages": ["INIT", "A", "DONE"]})
+    state = sm.load()
+    state["status"] = "done"
+    sm.save(state)
+
+    with pytest.raises(ValueError, match="Unknown stage"):
+        sm.rewind_to("NOPE")
+    with pytest.raises(ValueError, match="Cannot rewind"):
+        sm.rewind_to("DONE")
+    with pytest.raises(ValueError, match="Cannot rewind"):
+        sm.rewind_to("INIT")
+
+
+def test_state_manager_rewind_requires_force_while_running(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-005")
+    sm.init({"task_id": "run-005"}, {"stages": ["INIT", "A", "B", "DONE"]})
+    with pytest.raises(RuntimeError, match="still marked running"):
+        sm.rewind_to("A")
+    assert sm.rewind_to("A", force=True)["current_stage"] == "A"
+
+
+def test_state_manager_rewind_requires_a_plan(tmp_path: Path) -> None:
+    sm = StateManager(tmp_path / "run-006")
+    sm.init({"task_id": "run-006"}, {"stages": ["INIT", "A", "DONE"]})
+    state = sm.load()
+    state.pop("plan")
+    sm.save(state)
+    with pytest.raises(FileNotFoundError, match="no plan"):
+        sm.rewind_to("A")
+
+
 def test_human_gate_inject_evidence(tmp_path: Path) -> None:
     hg = HumanGate(tmp_path / "run-002")
     (tmp_path / "run-002" / "evidence").mkdir(parents=True)

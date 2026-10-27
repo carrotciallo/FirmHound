@@ -914,22 +914,43 @@ def explain(
 
 @main.command()
 @click.argument("run_id")
+@click.option(
+    "--from-stage",
+    "from_stage",
+    default=None,
+    metavar="STAGE",
+    help="Rewind to STAGE and re-run it and all later stages (works on finished runs).",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Allow rewinding a run whose state is still marked running.",
+)
 @click.option("--json-output", is_flag=True)
 @click.pass_context
-def resume(ctx: click.Context, run_id: str, json_output: bool) -> None:
-    """Resume an interrupted run from its first incomplete stage."""
+def resume(
+    ctx: click.Context,
+    run_id: str,
+    from_stage: str | None,
+    force: bool,
+    json_output: bool,
+) -> None:
+    """Resume an interrupted run, or rewind a finished run with --from-stage."""
     try:
-        state = Orchestrator(config_path=ctx.obj["config"]).resume(run_id)
+        state = Orchestrator(config_path=ctx.obj["config"]).resume(
+            run_id, from_stage=from_stage, force=force
+        )
     except Exception as exc:  # noqa: BLE001
         raise click.ClickException(str(exc)) from exc
-    _emit(
-        {
-            "status": state["status"],
-            "run_id": state["run_id"],
-            "current_stage": state["current_stage"],
-        },
-        json_output,
-    )
+    payload = {
+        "status": state["status"],
+        "run_id": state["run_id"],
+        "current_stage": state["current_stage"],
+    }
+    if from_stage:
+        payload["rewound_from"] = from_stage.strip().upper()
+        payload["backup"] = (state.get("metadata") or {}).get("last_rewind", {}).get("backup")
+    _emit(payload, json_output)
     if state["status"] != "done":
         raise click.exceptions.Exit(2)
 

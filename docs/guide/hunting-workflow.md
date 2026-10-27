@@ -257,7 +257,8 @@ fsa report hunt1 --limit 20
 - 当前候选与 Top N 排序
 - 如果有 `verdict.json`，附上已有裁决；没有就明确写「VERIFY_TOP_K 未完成」
 - `AGENT_LOOP` 已执行的动作、模型调用、token、回退与 limitations
-- 缺失产物和恢复命令 `fsa resume <run-id>`
+- 缺失产物和恢复命令 `fsa resume <run-id>`；如果 run 已经标成 done，用
+  `fsa resume <run-id> --from-stage <STAGE>` 回退到指定阶段重跑（会先备份 `run_state.json`）
 
 它不会写 `report.md` 或 `final_verdict.json`，也不会把未验证候选说成确认漏洞。
 恢复完成后，仍以最终 `report.md` 为准。

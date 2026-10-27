@@ -118,6 +118,69 @@ def test_cli_analyze_rootfs_reaches_done(depth: str) -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def test_cli_resume_from_stage_rewinds_finished_run() -> None:
+    workspace = (Path("tmp") / f"cli-rewind-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        run_id = "cli-rewind"
+        runner = CliRunner()
+        first = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--depth",
+                "quick",
+                "--authorization-holder",
+                "fixture-owner",
+                "--run-id",
+                run_id,
+            ],
+        )
+        assert first.exit_code == 0, first.output
+        run = workspace / "runs" / run_id
+        assert load_json(run / "state" / "run_state.json")["status"] == "done"
+
+        second = runner.invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "resume",
+                run_id,
+                "--from-stage",
+                "report",
+                "--json-output",
+            ],
+        )
+        assert second.exit_code == 0, second.output
+        payload = json.loads(second.output)
+        assert payload["status"] == "done"
+        assert payload["rewound_from"] == "REPORT"
+        assert Path(payload["backup"]).is_file()
+
+        state = load_json(run / "state" / "run_state.json")
+        assert state["status"] == "done"
+        assert state["current_stage"] == "DONE"
+        assert state["metadata"]["last_rewind"]["from_stage"] == "REPORT"
+        assert "REPORT" in state["completed_stages"]
+        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 24
+
+        bad = runner.invoke(
+            main,
+            ["--config", str(config), "resume", run_id, "--from-stage", "NOPE"],
+        )
+        assert bad.exit_code != 0
+        assert "Unknown stage" in bad.output
+        assert load_json(run / "state" / "run_state.json")["status"] == "done"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def test_cli_status_rejects_path_traversal() -> None:
     workspace = (Path("tmp") / f"cli-status-test-{uuid.uuid4().hex}").resolve()
     workspace.mkdir(parents=True)

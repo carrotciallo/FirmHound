@@ -77,6 +77,55 @@ class StateManager:
         self.save(state)
         return state
 
+    def rewind_to(self, stage: str, *, force: bool = False) -> dict[str, Any]:
+        """Reopen a run at ``stage`` so it and every later stage run again.
+
+        Earlier completed stages are preserved; later stages are removed from
+        ``completed_stages``. The pre-rewind state is backed up under
+        ``state/run_state.rewind-*.json`` before anything is modified.
+        """
+        state = self.load()
+        stages = (state.get("plan") or {}).get("stages") or []
+        if not stages:
+            raise FileNotFoundError(f"Run state has no plan: {self.state_path}")
+        if stage not in stages:
+            raise ValueError(f"Unknown stage {stage!r}; choose from {stages}")
+        if stage in {"INIT", "DONE"}:
+            raise ValueError(f"Cannot rewind to {stage}; choose a real analysis stage")
+        if state.get("status") == "running" and not force:
+            raise RuntimeError(
+                "Run is still marked running; stop the active process first or pass --force"
+            )
+
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        backup = self.run_dir / "state" / f"run_state.rewind-{stamp}.json"
+        counter = 1
+        while backup.exists():
+            backup = self.run_dir / "state" / f"run_state.rewind-{stamp}-{counter}.json"
+            counter += 1
+        save_json(backup, state)
+
+        index = stages.index(stage)
+        completed = set(state.get("completed_stages", []))
+        state["completed_stages"] = [item for item in stages[:index] if item in completed]
+        state["failed_stages"] = [
+            item for item in state.get("failed_stages", []) if item in stages[:index]
+        ]
+        last_error = state.get("last_error") or {}
+        if last_error.get("stage") in stages[index:]:
+            state.pop("last_error", None)
+        state["status"] = "running"
+        state["current_stage"] = stage
+        metadata = state.setdefault("metadata", {})
+        metadata["resumed"] = True
+        metadata["last_rewind"] = {
+            "from_stage": stage,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "backup": str(backup),
+        }
+        self.save(state)
+        return state
+
     def resume(self) -> dict[str, Any]:
         """Return the next stage to execute based on completed stages."""
         state = self.load()

@@ -203,17 +203,27 @@ class Orchestrator:
 
         return self._state_manager.load()  # type: ignore[union-attr]
 
-    def resume(self, run_id: str) -> dict[str, Any]:
-        """Resume a run from its last completed stage."""
+    def resume(
+        self,
+        run_id: str,
+        *,
+        from_stage: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Resume a run, optionally rewinding a finished run to ``from_stage``."""
         validate_run_id(run_id)
         self._run_dir = Path(self.config["paths"]["runs"]) / run_id
         self.policy.check_path(self._run_dir)
         if not self._run_dir.is_dir():
             raise FileNotFoundError(f"Run not found: {self._run_dir}")
+        if not (self._run_dir / "state" / "run_state.json").is_file():
+            raise FileNotFoundError(f"Run state not found: {self._run_dir}")
         self._state_manager = StateManager(self._run_dir)
         self._evidence_store = EvidenceStore(self._run_dir)
         self._decision_store = DecisionStore(self._run_dir)
         self._human_gate = HumanGate(self._run_dir)
+        if from_stage:
+            self._state_manager.rewind_to(from_stage.strip().upper(), force=force)
         state = self._state_manager.resume()
         if state["status"] in {"aborted", "paused"}:
             state["status"] = "running"

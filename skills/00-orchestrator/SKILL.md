@@ -82,6 +82,9 @@ INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STA
 5. **断点续跑（Orchestrator.resume）**
    - 读 run_state.json 找首个未完成阶段，从该阶段继续；`metadata.resumed=true` 落盘。
    - 每阶段完成即持久化，异常中断不丢已做工作。
+   - `--from-stage <STAGE>`：把已完成/中断的 run 回退到指定阶段，保留更早阶段产物，
+     重跑该阶段及后续；回退前先备份 `state/run_state.rewind-*.json`。
+     运行状态仍为 `running` 时必须先停掉进程或显式 `--force`。
 
 6. **反证审查（CandidateVerifier，M7）**
    - 对 Top-K 候选跑 10 问清单，规则推导出裁决动作：`ACCEPT` / `DOWNGRADE` / `REJECT` / `NEED_DYNAMIC`。

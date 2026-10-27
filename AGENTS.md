@@ -31,6 +31,7 @@ fsa analyze <firmware|rootfs> --input-type rootfs \
   --authorization-holder "设备所有者" --depth standard --run-id hunt1
 fsa explain <run-id> --format markdown
 fsa status <run-id> ; fsa resume <run-id>
+fsa resume <run-id> --from-stage REPORT   # 已完成的 run 也可回退重跑某阶段及后续
 ```
 
 ## 2. 代码结构与职责边界
@@ -66,7 +67,8 @@ fsa status <run-id> ; fsa resume <run-id>
    合法动作排序/选择，不得生成工具名、路径、参数或漏洞结论；Agent 动作不得修改
    `conclusion_category` / `status` / `risk_level`。
 7. **幂等与续跑**：阶段产物写到 `runs/<run_id>/artifacts/`，已存在则覆盖为最新且可重复执行；
-   中断后 `fsa resume` 必须能从第一个未完成阶段继续。
+   中断后 `fsa resume` 必须能从第一个未完成阶段继续；`--from-stage` 回退前必须备份
+   `run_state.json`，且回退只影响目标阶段及其后续。
 
 ## 4. 改动守则
 
