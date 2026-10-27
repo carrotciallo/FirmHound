@@ -151,6 +151,32 @@ fsa analyze tmp/unpacked/_DIR-859_Ax_FW_113b03.bin.extracted/squashfs-root \
 
 命令会按阶段自动执行：解包确认 → 目录清单 → Web 枚举 → 启动脚本 → ELF 分析 → 静态审计 → 十维评分 → 反证验证 → 出报告。
 
+**实时进度**：默认在终端显示当前阶段，每 0.5 秒刷新耗时；长阶段不会看起来像卡死。
+
+```text
+[2/11] BASELINE  ok  0.0s
+[3/11] UNPACK  running  6.4s
+[4/11] SURFACE  ok  1.2s
+[5/12] AGENT_LOOP  running  42.1s  · agent step 120 · cand-c32784f3ddeb · cross_check_imports_strings
+```
+
+最后一行是 `--agent` 时的效果：Agent 每 10 步汇报一次当前候选和动作。
+
+后台跑时把进度写进日志，再用 `tail -f` 看：
+
+```bash
+nohup fsa analyze tmp/unpacked/<extracted>/squashfs-root \
+  --input-type rootfs \
+  --authorization-holder "设备所有者" \
+  --run-id hunt1 --progress \
+  > runs/hunt1.out 2> runs/hunt1.progress.log &
+
+tail -f runs/hunt1.progress.log     # 另开一个终端看实时阶段
+```
+
+不需要进度行时加 `--no-progress`；用 `--json-output` 时默认关闭，显式 `--progress`
+也只会写 stderr，JSON 仍从 stdout 输出。
+
 跑完看到：
 
 ```

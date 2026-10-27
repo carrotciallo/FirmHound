@@ -118,6 +118,40 @@ def test_cli_analyze_rootfs_reaches_done(depth: str) -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def test_cli_analyze_progress_flag_prints_stage_lines() -> None:
+    workspace = (Path("tmp") / f"cli-progress-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        runner = CliRunner()
+        base = [
+            "--config",
+            str(config),
+            "analyze",
+            str(rootfs),
+            "--depth",
+            "quick",
+            "--authorization-holder",
+            "fixture-owner",
+        ]
+
+        noisy = runner.invoke(
+            main, [*base, "--run-id", "cli-progress", "--progress"]
+        )
+        assert noisy.exit_code == 0, noisy.output
+        assert "[2/" in noisy.output
+        assert "BASELINE" in noisy.output
+
+        quiet = runner.invoke(
+            main, [*base, "--run-id", "cli-quiet", "--no-progress"]
+        )
+        assert quiet.exit_code == 0, quiet.output
+        assert "BASELINE" not in quiet.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def test_cli_resume_from_stage_rewinds_finished_run() -> None:
     workspace = (Path("tmp") / f"cli-rewind-test-{uuid.uuid4().hex}").resolve()
     workspace.mkdir(parents=True)

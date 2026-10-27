@@ -7,7 +7,7 @@ import time
 import uuid
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fsa.orchestrator.human_gate import HumanGate
 from fsa.orchestrator.planner import Planner
@@ -20,6 +20,10 @@ from fsa.runtime.tool_registry import ToolRegistry
 from fsa.safety.policy_engine import PolicyEngine
 from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_yaml
+from fsa.utils.progress import use_progress
+
+if TYPE_CHECKING:
+    from fsa.utils.progress import PipelineProgress
 
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
@@ -180,7 +184,12 @@ class Orchestrator:
             "max_total_duration_seconds": cfg.get("max_total_duration_seconds", 3600),
         }
 
-    def run(self, task_card: dict[str, Any]) -> dict[str, Any]:
+    def run(
+        self,
+        task_card: dict[str, Any],
+        *,
+        progress: PipelineProgress | None = None,
+    ) -> dict[str, Any]:
         """Execute the full pipeline."""
         self.create_run(task_card)
         state = self._state_manager.load()  # type: ignore[union-attr]
@@ -189,7 +198,7 @@ class Orchestrator:
         for stage in stages:
             if stage in {Stage.INIT.value, Stage.DONE.value}:
                 continue
-            state = self._execute_stage(stage)
+            state = self._execute_stage(stage, progress=progress)
             if state["status"] == "aborted":
                 break
 
@@ -209,6 +218,7 @@ class Orchestrator:
         *,
         from_stage: str | None = None,
         force: bool = False,
+        progress: PipelineProgress | None = None,
     ) -> dict[str, Any]:
         """Resume a run, optionally rewinding a finished run to ``from_stage``."""
         validate_run_id(run_id)
@@ -238,7 +248,7 @@ class Orchestrator:
                 started = True
             if not started or stage in {Stage.INIT.value, Stage.DONE.value}:
                 continue
-            state = self._execute_stage(stage)
+            state = self._execute_stage(stage, progress=progress)
             if state["status"] == "aborted":
                 break
         state = self._state_manager.load()
@@ -254,80 +264,103 @@ class Orchestrator:
             self._state_manager.save(state)
         return self._state_manager.load()  # type: ignore[union-attr]
 
-    def _execute_stage(self, stage: str) -> dict[str, Any]:
+    def _execute_stage(
+        self,
+        stage: str,
+        *,
+        progress: PipelineProgress | None = None,
+    ) -> dict[str, Any]:
         """Run a single stage, handling success/partial/failure transitions."""
         state = self._state_manager.load()  # type: ignore[union-attr]
-        state["current_stage"] = stage
-        self._state_manager.save(state)  # type: ignore[union-attr]
-
-        stage_cfg = state["plan"].get("stage_configs", {}).get(stage, {})
-        tool_name = stage_cfg.get("tool")
-        required = stage_cfg.get("required", True)
-
-        self._log_decision(
-            stage=stage,
-            options=["execute", "skip", "abort"],
-            selected="execute",
-            reason=f"Entering stage {stage} with tool {tool_name}",
-            confidence=1.0,
-        )
-
-        if tool_name is None:
-            self._state_manager.mark_stage_complete(stage)  # type: ignore[union-attr]
-            return self._state_manager.load()  # type: ignore[union-attr]
-
+        stages = state["plan"].get("stages", [])
+        index = stages.index(stage) + 1 if stage in stages else 0
+        started = time.monotonic()
+        status = "unknown"
+        if progress is not None:
+            progress.stage_start(stage, index, len(stages))
         try:
-            tool_args = {"run_dir": str(self._run_dir)}
-            tool_args.update(stage_cfg.get("args", {}))
-            result = self.registry.call(tool_name, tool_args)
-        except Exception as exc:  # noqa: BLE001
-            result = ToolResult(status="error", stderr=str(exc))
+            state["current_stage"] = stage
+            self._state_manager.save(state)  # type: ignore[union-attr]
 
-        output_status = result.output.get("status") if isinstance(result.output, dict) else None
-        if result.status == "success" and output_status in {"failed", "unsafe"}:
-            result = ToolResult(
-                status="error",
-                output=result.output,
-                stderr=str(result.output.get("reason", "tool reported failure")),
-                duration_ms=result.duration_ms,
-            )
-        elif result.status == "success" and output_status in {
-            "degraded",
-            "partial",
-            "skipped",
-            "timeout",
-        }:
-            result = ToolResult(
-                status="partial",
-                output=result.output,
-                stderr=str(result.output.get("reason", "tool reported degraded result")),
-                duration_ms=result.duration_ms,
-            )
+            stage_cfg = state["plan"].get("stage_configs", {}).get(stage, {})
+            tool_name = stage_cfg.get("tool")
+            required = stage_cfg.get("required", True)
 
-        if result.status == "success":
-            next_stage, _ = TRANSITIONS.get(stage, (Stage.DONE.value, None))
-            self._state_manager.mark_stage_complete(stage, result.output)  # type: ignore[union-attr]
-        elif result.status == "partial":
-            _, fallback = TRANSITIONS.get(stage, (Stage.DONE.value, None))
             self._log_decision(
                 stage=stage,
-                options=["retry", "fallback", "abort"],
-                selected="fallback",
-                reason=(
-                    f"Stage {stage} returned degraded; continuing with "
-                    f"{fallback or 'next stage'}"
-                ),
-                confidence=0.5,
+                options=["execute", "skip", "abort"],
+                selected="execute",
+                reason=f"Entering stage {stage} with tool {tool_name}",
+                confidence=1.0,
             )
-            self._state_manager.mark_stage_complete(stage, result.output)  # type: ignore[union-attr]
-        else:
-            self._state_manager.mark_stage_failed(stage, result.stderr or "failure")  # type: ignore[union-attr]
-            if required:
-                state = self._state_manager.load()  # type: ignore[union-attr]
-                state["status"] = "aborted"
-                self._state_manager.save(state)  # type: ignore[union-attr]
 
-        return self._state_manager.load()  # type: ignore[union-attr]
+            if tool_name is None:
+                self._state_manager.mark_stage_complete(stage)  # type: ignore[union-attr]
+                status = "ok"
+                return self._state_manager.load()  # type: ignore[union-attr]
+
+            try:
+                tool_args = {"run_dir": str(self._run_dir)}
+                tool_args.update(stage_cfg.get("args", {}))
+                with use_progress(progress):
+                    result = self.registry.call(tool_name, tool_args)
+            except Exception as exc:  # noqa: BLE001
+                result = ToolResult(status="error", stderr=str(exc))
+
+            output_status = (
+                result.output.get("status") if isinstance(result.output, dict) else None
+            )
+            if result.status == "success" and output_status in {"failed", "unsafe"}:
+                result = ToolResult(
+                    status="error",
+                    output=result.output,
+                    stderr=str(result.output.get("reason", "tool reported failure")),
+                    duration_ms=result.duration_ms,
+                )
+            elif result.status == "success" and output_status in {
+                "degraded",
+                "partial",
+                "skipped",
+                "timeout",
+            }:
+                result = ToolResult(
+                    status="partial",
+                    output=result.output,
+                    stderr=str(result.output.get("reason", "tool reported degraded result")),
+                    duration_ms=result.duration_ms,
+                )
+
+            if result.status == "success":
+                status = "ok"
+                self._state_manager.mark_stage_complete(stage, result.output)  # type: ignore[union-attr]
+            elif result.status == "partial":
+                status = "degraded"
+                _, fallback = TRANSITIONS.get(stage, (Stage.DONE.value, None))
+                self._log_decision(
+                    stage=stage,
+                    options=["retry", "fallback", "abort"],
+                    selected="fallback",
+                    reason=(
+                        f"Stage {stage} returned degraded; continuing with "
+                        f"{fallback or 'next stage'}"
+                    ),
+                    confidence=0.5,
+                )
+                self._state_manager.mark_stage_complete(stage, result.output)  # type: ignore[union-attr]
+            else:
+                status = "aborted" if required else "failed"
+                self._state_manager.mark_stage_failed(  # type: ignore[union-attr]
+                    stage, result.stderr or "failure"
+                )
+                if required:
+                    state = self._state_manager.load()  # type: ignore[union-attr]
+                    state["status"] = "aborted"
+                    self._state_manager.save(state)  # type: ignore[union-attr]
+
+            return self._state_manager.load()  # type: ignore[union-attr]
+        finally:
+            if progress is not None:
+                progress.stage_end(stage, status, time.monotonic() - started)
 
     def _log_decision(
         self,

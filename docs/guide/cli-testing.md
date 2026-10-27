@@ -77,6 +77,20 @@ fsa analyze <FIRMWARE_BIN_OR_CHK> \
   `ranking.json`、`verdict.json`
 - 报告「外部分析器结果」一节写清缺哪些工具、哪些结论因此受限，**不写假命中**
 
+实时进度的可验证行为：
+
+```bash
+fsa analyze <ROOTFS_DIR> --input-type rootfs \
+  --authorization-holder "<授权人>" --progress 2>progress.log
+cat progress.log            # 含 [n/total] STAGE 开始行与 ok/degraded 结束行
+```
+
+- `--progress` 只写 stderr；`--json-output` 的 stdout 仍可被 `jq` 解析
+- `--no-progress` 输出中不出现阶段进度行
+- 阶段耗时与状态来自引擎实际执行结果，不是预估
+- 加 `--agent` 时，`progress.log` 里应出现 `agent step N · <candidate> · <action>`
+  （每 10 步一条，重定向时每秒最多一条）
+
 ## 5. Full Depth 降级
 
 ```bash

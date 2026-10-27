@@ -22,6 +22,7 @@ from fsa.utils.config_files import resolve_config_file
 from fsa.utils.jsonio import load_json, load_yaml
 from fsa.utils.platform_info import detect as detect_platform
 from fsa.utils.platform_info import hint_for
+from fsa.utils.progress import StageProgress
 from tools.firmware.diagnose import diagnose_firmware
 from tools.report.explain import build_evidence_ledger, render_ledger_markdown
 from tools.report.partial import execute_partial_report
@@ -340,6 +341,11 @@ def plan(
 )
 @click.option("--json-output", is_flag=True, help="Emit one JSON object per input.")
 @click.option(
+    "--progress/--no-progress",
+    default=None,
+    help="Show live stage progress on stderr (default: on unless --json-output).",
+)
+@click.option(
     "--blind/--no-blind",
     default=False,
     show_default=True,
@@ -360,6 +366,7 @@ def analyze(
     version: str | None,
     run_id: str | None,
     json_output: bool,
+    progress: bool | None,
     blind: bool,
     agent: bool | None,
     agent_tier: str | None,
@@ -417,9 +424,18 @@ def analyze(
         ),
     }
 
+    show_progress = progress if progress is not None else not json_output
     results = []
     for index, (source, kind) in enumerate(targets):
-        result = _analyse_one(ctx.obj["config"], source, kind, options, index, len(targets))
+        result = _analyse_one(
+            ctx.obj["config"],
+            source,
+            kind,
+            options,
+            index,
+            len(targets),
+            progress=show_progress,
+        )
         results.append(result)
         _report_result(result, json_output, index, len(targets))
 
@@ -465,6 +481,8 @@ def _analyse_one(
     options: dict[str, Any],
     index: int,
     total: int,
+    *,
+    progress: bool = False,
 ) -> dict[str, Any]:
     """Run one input and return a result record, never raising on analysis failure."""
     result: dict[str, Any] = {
@@ -506,7 +524,11 @@ def _analyse_one(
             input_type=kind,
             depth=task_card["depth"],
         )
-        state = orchestrator.run(task_card)
+        reporter = StageProgress(
+            enabled=progress,
+            prefix=f"[{task_card['task_id']}] " if total > 1 else "",
+        )
+        state = orchestrator.run(task_card, progress=reporter)
     except Exception as exc:  # noqa: BLE001
         structlog.get_logger().error("analysis_failed", error=str(exc), input=str(source))
         result["error"] = f"{type(exc).__name__}: {exc}"
@@ -927,6 +949,11 @@ def explain(
     help="Allow rewinding a run whose state is still marked running.",
 )
 @click.option("--json-output", is_flag=True)
+@click.option(
+    "--progress/--no-progress",
+    default=None,
+    help="Show live stage progress on stderr (default: on unless --json-output).",
+)
 @click.pass_context
 def resume(
     ctx: click.Context,
@@ -934,11 +961,16 @@ def resume(
     from_stage: str | None,
     force: bool,
     json_output: bool,
+    progress: bool | None,
 ) -> None:
     """Resume an interrupted run, or rewind a finished run with --from-stage."""
+    show_progress = progress if progress is not None else not json_output
     try:
         state = Orchestrator(config_path=ctx.obj["config"]).resume(
-            run_id, from_stage=from_stage, force=force
+            run_id,
+            from_stage=from_stage,
+            force=force,
+            progress=StageProgress(enabled=show_progress),
         )
     except Exception as exc:  # noqa: BLE001
         raise click.ClickException(str(exc)) from exc

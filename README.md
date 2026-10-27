@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%20--%203.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Linux-2F6FAD)](#环境配置linux)
-[![Tests](https://img.shields.io/badge/tests-446%20passed%20%7C%201%20skipped-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-450%20passed%20%7C%201%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -69,7 +69,7 @@
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
 | 🧭 受控自主执行 | `--agent` 开启有界取证循环；模型只排序合法动作，不决定漏洞结论 |
 | 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 24 节骨架，静态结论保留反证与限制 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，446 项单元测试持续守护 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，450 项单元测试持续守护 |
 
 ## 快速开始（60 秒）
 
@@ -267,12 +267,12 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 |---|---|---|
 | `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
 | `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
-| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind] [--agent] [--agent-tier standard\|dynamic\|external]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具与 Agent；`--agent` 开启有界自主取证 | `runs/<run-id>/` 全量证据、状态、报告、`agent_trace.json` |
+| `fsa analyze <固件或rootfs>... --authorization-holder <授权主体> [--blind] [--agent] [--agent-tier standard\|dynamic\|external] [--progress\|--no-progress]` | **正式分析入口**；自动识别文件/目录，可一次传多个路径，每条路径一个 run；`--blind` 强制禁用 Recurrence 工具与 Agent；`--agent` 开启有界自主取证；`--progress` 在 stderr 实时显示阶段进度 | `runs/<run-id>/` 全量证据、状态、报告、`agent_trace.json` |
 | `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
 | `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa report <run-id> [--limit N]` | 从已有产物生成中断快照报告；不运行分析、验证或模型 | `runs/<id>/report.partial.md` |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
-| `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
+| `fsa resume <run-id> [--progress\|--no-progress]` | 从第一个未完成阶段恢复 | 更新原运行目录 |
 | `fsa resume <run-id> --from-stage <STAGE>` | 回退到指定阶段并重跑该阶段及后续；已完成 run 也可用；先备份 `run_state.json` | 更新原运行目录；备份在 `state/run_state.rewind-*.json` |
 | `make smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |
 | `make test` | 跑全部单元测试 | — |
@@ -286,6 +286,38 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
 | `python scripts/run_e2e.py --fixture-mode ...` | 合成样本回归（必须显式确认 fixture 模式） | 演练产物 |
 | `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
+
+### 实时进度
+
+`analyze` 和 `resume` 默认把阶段进度写到 **stderr**，stdout 仍是结果/JSON：
+
+```bash
+# 终端里直接看：当前阶段每 0.5 秒刷新一次计时
+fsa analyze firmware_samples/DIR859_FW102b03.bin \
+  --authorization-holder "设备所有者" --agent --progress
+
+# 后台跑：进度进日志，JSON 结果单独进 stdout
+nohup fsa analyze firmware_samples/DIR859_FW102b03.bin \
+  --authorization-holder "设备所有者" --json-output --progress \
+  > runs/hunt1.json 2> runs/hunt1.progress.log &
+tail -f runs/hunt1.progress.log
+
+# 从已完成 run 的 REPORT 阶段重跑，同样能看到进度
+fsa resume dir859-ai-full --from-stage REPORT --progress
+
+# 不想要任何进度行
+fsa analyze <rootfs> --authorization-holder "设备所有者" --no-progress
+```
+
+`AGENT_LOOP` 每执行 10 步会把当前候选和动作附在阶段行后面，例如：
+
+```text
+[5/12] AGENT_LOOP  running  42.1s  · agent step 120 · cand-c32784f3ddeb · cross_check_imports_strings
+```
+
+非终端（重定向/CI）时不会刷新单行计时，而是输出阶段开始/结束行以及每秒最多一条
+Agent 步骤明细；`--json-output` 默认关闭进度，需要时显式加 `--progress`，进度只走
+stderr，不污染 stdout。
 
 ## 配置说明
 

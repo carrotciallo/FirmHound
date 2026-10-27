@@ -22,6 +22,7 @@ from fsa.runtime.mock import OfflineRuleRuntime
 from fsa.safety.policy_engine import PolicyEngine
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import load_json, save_json
+from fsa.utils.progress import report_detail
 from tools.analysis.risk_score import rank_candidates
 from tools.audit.agent_actions import ACTION_HANDLERS, build_context
 from tools.pipeline_context import load_artifact, load_task, run_path
@@ -561,6 +562,11 @@ def run_agent_loop(
             step += 1
             tool_calls += 1
             candidate_steps[cid] = candidate_steps.get(cid, 0) + 1
+            new_steps = step - len(replayed)
+            if new_steps == 1 or new_steps % 10 == 0:
+                report_detail(
+                    f"agent step {new_steps} · {cid} · {chosen.action_id}"
+                )
             elapsed = time.monotonic() - (deadline - max_seconds)
             trace["budget"].update(
                 {
