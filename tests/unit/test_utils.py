@@ -1,6 +1,10 @@
 """Unit tests for fsa.utils helpers."""
 
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from fsa.utils.hashing import md5_file, sha256_bytes, sha256_file
 from fsa.utils.jsonio import load_json, save_json
@@ -59,7 +63,7 @@ def test_jsonio_roundtrip(tmp_path: Path) -> None:
 
 def test_run_command_success() -> None:
     """run_command captures stdout and success status."""
-    result = run_command(["python", "-c", "print('ok')"])
+    result = run_command([sys.executable, "-c", "print('ok')"])
     assert result.status == "success"
     assert result.returncode == 0
     assert result.stdout.strip() == "ok"
@@ -67,12 +71,71 @@ def test_run_command_success() -> None:
 
 def test_run_command_failure() -> None:
     """run_command returns failed status without raising."""
-    result = run_command(["python", "-c", "import sys; sys.exit(1)"])
+    result = run_command([sys.executable, "-c", "import sys; sys.exit(1)"])
     assert result.status == "failed"
     assert result.returncode == 1
 
 
 def test_run_command_timeout() -> None:
     """run_command returns timeout status for slow commands."""
-    result = run_command(["python", "-c", "import time; time.sleep(10)"], timeout=0.1)
+    result = run_command([sys.executable, "-c", "import time; time.sleep(10)"], timeout=0.1)
     assert result.status == "timeout"
+
+
+def test_run_command_missing_executable() -> None:
+    """A missing binary is a failed result, not an exception.
+
+    Optional external tools (binwalk, docker, qemu, ...) are routinely
+    absent; probing for them must degrade, not crash the caller.
+    """
+    result = run_command(["definitely-not-a-real-tool-firmhound", "--help"])
+    assert result.status == "failed"
+    assert result.returncode == -1
+    assert result.stderr
+
+
+def test_run_command_empty_command() -> None:
+    """An empty command is a failed result, not an exception."""
+    result = run_command([])
+    assert result.status == "failed"
+    assert result.returncode == -1
+
+
+def test_run_command_missing_cwd(tmp_path: Path) -> None:
+    """A nonexistent cwd is a failed result, not an exception."""
+    result = run_command(
+        [sys.executable, "-c", "print('ok')"], cwd=tmp_path / "does-not-exist"
+    )
+    assert result.status == "failed"
+    assert result.returncode == -1
+
+
+def test_run_command_child_stdin_is_devnull(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The child must never inherit the caller's stdin.
+
+    Tools such as 7z read from stdin when it is a pipe and block forever
+    if it never reaches EOF, hanging the pipeline past every timeout.
+    """
+    import fsa.utils.proc as proc_module
+
+    captured: dict[str, object] = {}
+    real_run = proc_module.subprocess.run
+
+    def spy(*args: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return real_run(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(proc_module.subprocess, "run", spy)
+    result = run_command([sys.executable, "-c", "print('ok')"])
+    assert result.status == "success"
+    assert captured.get("stdin") is subprocess.DEVNULL
+
+
+def test_run_command_stdin_reader_gets_eof() -> None:
+    """A child that reads stdin to EOF completes immediately."""
+    result = run_command(
+        [sys.executable, "-c", "import sys; print(len(sys.stdin.read()))"],
+        timeout=10,
+    )
+    assert result.status == "success"
+    assert result.stdout.strip() == "0"
